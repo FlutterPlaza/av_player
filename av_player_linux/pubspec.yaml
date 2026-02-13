@@ -1,0 +1,27 @@
+name: av_player_linux
+description: Linux implementation of the av_player plugin.
+version: 0.2.0-beta.1
+homepage: https://github.com/FlutterPlaza/av_player
+repository: https://github.com/FlutterPlaza/av_player/tree/main/av_player_linux
+
+environment:
+  sdk: ^3.4.0
+
+flutter:
+  plugin:
+    implements: av_player
+    platforms:
+      linux:
+        pluginClass: AvPlayerPlugin
+        dartPluginClass: AvPlayerLinux
+
+dependencies:
+  flutter:
+    sdk: flutter
+  av_player_platform_interface:
+    path: ../av_player_platform_interface
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

@@ -1,0 +1,34 @@
+name: av_player_platform_interface
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/av_player_platform_interface.yaml"
+      - "av_player_platform_interface/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/av_player_platform_interface.yaml"
+      - "av_player_platform_interface/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: av_player_platform_interface
+      - run: dart format --set-exit-if-changed .
+        working-directory: av_player_platform_interface
+      - run: dart analyze --fatal-infos
+        working-directory: av_player_platform_interface
+      - run: flutter test
+        working-directory: av_player_platform_interface

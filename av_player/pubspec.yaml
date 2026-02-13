@@ -1,0 +1,48 @@
+name: av_player
+description: A powerful Flutter video player with native Picture-in-Picture support, gesture controls, media notifications, and playlist management. Zero external dependencies.
+version: 0.2.0-beta.1
+homepage: https://github.com/FlutterPlaza/av_player
+repository: https://github.com/FlutterPlaza/av_player
+issue_tracker: https://github.com/FlutterPlaza/av_player/issues
+
+environment:
+  sdk: ^3.4.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: av_player_android
+      ios:
+        default_package: av_player_ios
+      linux:
+        default_package: av_player_linux
+      macos:
+        default_package: av_player_macos
+      web:
+        default_package: av_player_web
+      windows:
+        default_package: av_player_windows
+
+dependencies:
+  flutter:
+    sdk: flutter
+  av_player_android:
+    path: ../av_player_android
+  av_player_ios:
+    path: ../av_player_ios
+  av_player_linux:
+    path: ../av_player_linux
+  av_player_macos:
+    path: ../av_player_macos
+  av_player_platform_interface:
+    path: ../av_player_platform_interface
+  av_player_web:
+    path: ../av_player_web
+  av_player_windows:
+    path: ../av_player_windows
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  plugin_platform_interface: ^2.1.8

@@ -1,0 +1,43 @@
+version: 2
+enable-beta-ecosystems: true
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player/example"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_platform_interface"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_android"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_ios"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_linux"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_macos"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_web"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player_windows"
+    schedule:
+      interval: "daily"

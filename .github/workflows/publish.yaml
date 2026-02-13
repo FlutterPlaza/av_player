@@ -1,0 +1,41 @@
+name: Publish to pub.dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        type: choice
+        options:
+          - av_player
+          - av_player_platform_interface
+          - av_player_android
+          - av_player_ios
+          - av_player_macos
+          - av_player_linux
+          - av_player_web
+          - av_player_windows
+      dry_run:
+        description: Dry run only
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Publish (dry run)
+        if: ${{ inputs.dry_run }}
+        run: flutter pub publish --dry-run
+        working-directory: ${{ inputs.package }}
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        run: flutter pub publish --force
+        working-directory: ${{ inputs.package }}
