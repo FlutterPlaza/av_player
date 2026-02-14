@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/av_player/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/actions/check_platform_name/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/actions/check_platform_name/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/actions/check_platform_name/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_android/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_android/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_android/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_ios/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_ios/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_ios/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_linux/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_linux/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_linux/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_macos/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_macos/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_macos/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_platform_interface/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_platform_interface/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_platform_interface/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_web/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_web/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_web/build" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_windows/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_windows/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/av_player_windows/build" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

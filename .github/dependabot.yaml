@@ -1,0 +1,15 @@
+version: 2
+enable-beta-ecosystems: true
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/av_player/example"
+    schedule:
+      interval: "daily"
