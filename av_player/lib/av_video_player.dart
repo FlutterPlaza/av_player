@@ -1,14 +1,14 @@
 import 'dart:async';
 
-import 'package:av_player_platform_interface/av_player_platform_interface.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'src/av_controls.dart';
 import 'src/av_gestures.dart';
+import 'src/platform/av_player_platform.dart';
 
 // Re-export types from platform interface so users only need one import.
-export 'package:av_player_platform_interface/av_player_platform_interface.dart'
+export 'src/platform/av_player_platform.dart'
     show
         AVVideoSource,
         AVNetworkSource,
@@ -203,9 +203,15 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
   }
 
   /// Starts or resumes playback.
+  ///
+  /// If the video has completed, seeks to the beginning first.
   Future<void> play() async {
     final id = _playerId;
     if (id == null) return;
+    if (value.isCompleted) {
+      await _platform.seekTo(id, Duration.zero);
+      value = value.copyWith(position: Duration.zero);
+    }
     await _platform.play(id);
     value = value.copyWith(isPlaying: true, isCompleted: false);
   }

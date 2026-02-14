@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:av_player_platform_interface/av_player_platform_interface.dart';
+import 'platform/av_player_platform.dart';
 import 'package:flutter/foundation.dart';
 
 /// Repeat modes for playlist playback.

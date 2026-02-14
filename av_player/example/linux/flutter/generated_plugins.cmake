@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  av_player_linux
+  av_player
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

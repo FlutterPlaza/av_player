@@ -1,48 +1,59 @@
 name: av_player
 description: A powerful Flutter video player with native Picture-in-Picture support, gesture controls, media notifications, and playlist management. Zero external dependencies.
-version: 0.2.0-beta.1
+version: 0.2.0-beta.3
 homepage: https://github.com/FlutterPlaza/av_player
 repository: https://github.com/FlutterPlaza/av_player
 issue_tracker: https://github.com/FlutterPlaza/av_player/issues
+topics:
+  - video-player
+  - picture-in-picture
+  - media
+  - pip
+  - player
+
+screenshots:
+  - description: 'Home screen with all feature demos'
+    path: doc/images/home_screen.png
+  - description: 'Video player with full controls and gestures'
+    path: doc/images/video_player.png
+  - description: 'Picture-in-Picture: native and in-app overlay'
+    path: doc/images/pip_native.png
+  - description: 'Theming with custom color presets'
+    path: doc/images/theming.png
 
 environment:
   sdk: ^3.4.0
+  flutter: ">=3.22.0"
 
 flutter:
   plugin:
     platforms:
       android:
-        default_package: av_player_android
+        pluginClass: AvPlayerPlugin
+        dartPluginClass: AvPlayerAndroid
       ios:
-        default_package: av_player_ios
+        pluginClass: AvPlayerPlugin
+        dartPluginClass: AvPlayerIOS
       linux:
-        default_package: av_player_linux
+        pluginClass: AvPlayerPlugin
+        dartPluginClass: AvPlayerLinux
       macos:
-        default_package: av_player_macos
+        pluginClass: AvPlayerPlugin
+        dartPluginClass: AvPlayerMacOS
       web:
-        default_package: av_player_web
+        pluginClass: AvPlayerWeb
+        fileName: src/platform/av_player_web.dart
       windows:
-        default_package: av_player_windows
+        pluginClass: AvPlayerWindows
+        dartPluginClass: AvPlayerWindows
 
 dependencies:
   flutter:
     sdk: flutter
-  av_player_android:
-    path: ../av_player_android
-  av_player_ios:
-    path: ../av_player_ios
-  av_player_linux:
-    path: ../av_player_linux
-  av_player_macos:
-    path: ../av_player_macos
-  av_player_platform_interface:
-    path: ../av_player_platform_interface
-  av_player_web:
-    path: ../av_player_web
-  av_player_windows:
-    path: ../av_player_windows
+  plugin_platform_interface: ^2.1.8
+  web: ^1.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  plugin_platform_interface: ^2.1.8

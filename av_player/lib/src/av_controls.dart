@@ -255,6 +255,7 @@ class _AVControlsState extends State<AVControls>
         _PlayPauseButton(
           isPlaying: state.isPlaying,
           isBuffering: state.isBuffering,
+          isCompleted: state.isCompleted,
           iconColor: theme.iconColor,
           onPressed: () {
             if (state.isPlaying) {
@@ -445,11 +446,13 @@ class _PlayPauseButton extends StatelessWidget {
     required this.isPlaying,
     required this.isBuffering,
     required this.onPressed,
+    this.isCompleted = false,
     this.iconColor = Colors.white,
   });
 
   final bool isPlaying;
   final bool isBuffering;
+  final bool isCompleted;
   final VoidCallback onPressed;
   final Color iconColor;
 
@@ -472,12 +475,18 @@ class _PlayPauseButton extends StatelessWidget {
       );
     }
 
+    final IconData icon;
+    if (isCompleted) {
+      icon = Icons.replay;
+    } else if (isPlaying) {
+      icon = Icons.pause_circle_filled;
+    } else {
+      icon = Icons.play_circle_filled;
+    }
+
     return IconButton(
       iconSize: 56,
-      icon: Icon(
-        isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-        color: iconColor,
-      ),
+      icon: Icon(icon, color: iconColor),
       onPressed: onPressed,
     );
   }

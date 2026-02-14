@@ -1,0 +1,26 @@
+# Tests (not needed by end users)
+test/
+
+# Example build artifacts & tooling
+example/build/
+example/.dart_tool/
+example/android/.gradle/
+example/ios/Pods/
+example/macos/Pods/
+example/actions/
+example/flows/
+example/fluttium.yaml
+example/integration_test/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+*.iml
+
+# CI/CD
+.github/
+
+# Coverage
+coverage/
+coverage_badge.svg
