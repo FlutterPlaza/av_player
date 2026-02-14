@@ -1,8 +1,8 @@
-# AV Picture-in-Picture — Roadmap & Development Plan
+# AV Player — Roadmap & Development Plan
 
-**Version:** 0.2.0-beta.1
-**Last Updated:** 2026-02-13
-**Status:** Beta — Android, iOS, macOS, Web, Linux fully implemented. Windows is a stub.
+**Version:** 0.2.1
+**Last Updated:** 2026-02-14
+**Status:** Published on pub.dev — Android, iOS, macOS, Web, Linux fully implemented. Windows is a stub.
 
 ---
 
@@ -11,15 +11,13 @@
 1. [Current Status Summary](#1-current-status-summary)
 2. [Known Limitations](#2-known-limitations)
 3. [Deferred Work](#3-deferred-work)
-4. [Phase 8: Web Implementation](#4-phase-8-web-implementation)
-5. [Phase 9: Linux Implementation](#5-phase-9-linux-implementation)
-6. [Phase 10: Windows Implementation](#6-phase-10-windows-implementation)
-7. [Phase 11: Integration & Widget Tests](#7-phase-11-integration--widget-tests)
-8. [Phase 12: Pigeon Migration](#8-phase-12-pigeon-migration)
-9. [Future Improvements](#9-future-improvements)
-10. [Execution Priority](#10-execution-priority)
-11. [Completed Phases (Reference)](#11-completed-phases-reference)
-12. [Test Coverage](#12-test-coverage)
+4. [Phase 10: Windows Implementation](#4-phase-10-windows-implementation)
+5. [Phase 11: Integration & Widget Tests](#5-phase-11-integration--widget-tests)
+6. [Phase 12: Pigeon Migration](#6-phase-12-pigeon-migration)
+7. [Future Improvements](#7-future-improvements)
+8. [Execution Priority](#8-execution-priority)
+9. [Completed Phases (Reference)](#9-completed-phases-reference)
+10. [Test Coverage](#10-test-coverage)
 
 ---
 
@@ -40,9 +38,12 @@
 | iOS native               | Done    | AVPlayer + PIP + MPNowPlaying    |
 | macOS native             | Done    | AVPlayer + PIP + CoreAudio + IOKit |
 | Web native               | Done    | HTML5 Video + PIP + MediaSession + WakeLock |
-| Linux native            | Done    | GStreamer + MPRIS2 + PulseAudio + sysfs |
+| Linux native             | Done    | GStreamer + MPRIS2 + PulseAudio + sysfs |
 | CI/CD                    | Done    | 11 GitHub workflow files         |
-| Dart-side tests          | Done    | 224 tests, all passing           |
+| Dart-side tests          | Done    | 220 tests, all passing           |
+| SPM support              | Done    | iOS and macOS (CocoaPods + SPM)  |
+| Single-package structure | Done    | Merged 8 federated packages into one |
+| Published to pub.dev     | Done    | v0.2.1                          |
 
 ### What's Not Done
 
@@ -60,6 +61,10 @@
 ### iOS — System Volume Read-Only
 
 Apple does not provide a public API to set system volume programmatically. `setSystemVolume()` returns a `FlutterError(UNSUPPORTED)` on iOS. `getSystemVolume()` works via `AVAudioSession.outputVolume`.
+
+### iOS — Minimum Deployment Target 13.0
+
+iOS deployment target is 13.0. Apps targeting iOS 12 or lower cannot use this plugin.
 
 ### macOS — External Display Brightness
 
@@ -119,7 +124,7 @@ Implemented in `AvPlayerWeb`: Media Session API with `setActionHandler()` for pl
 - Handle notification tap → open app at specific video with timestamp
 ```
 
-**Deferred to:** Post-beta. Requires platform-specific notification handling and app routing integration that goes beyond the plugin scope.
+**Deferred to:** Post-stable. Requires platform-specific notification handling and app routing integration that goes beyond the plugin scope.
 
 ### 3.3 Full Builder API (from Phase 5.3)
 
@@ -127,92 +132,7 @@ A monolithic `AVPlayerConfig` object combining `AVControlsConfig`, `AVGestureCon
 
 ---
 
-## 4. Phase 8: Web Implementation — DONE
-
-**Interop:** `dart:js_interop` + `package:web` (Wasm-compatible, no dart:html)
-**Completed:** 2026-02-13
-
-### 8.1 HTML5 Video Playback
-
-- [x] Create `<video>` element via `package:web` (`HTMLVideoElement`)
-- [x] Register as platform view via `dart:ui_web.platformViewRegistry`
-- [x] Support network URLs (MP4 native, custom headers via fetch + blob URL)
-- [x] Map `<video>` events to `AVPlayerEvent` stream (loadedmetadata, play, pause, ended, error, waiting, playing, progress, enterpictureinpicture, leavepictureinpicture)
-- [x] Implement play/pause/seek/speed/volume/looping
-- [x] Position polling via `Timer.periodic` (200ms)
-- [x] Asset and file source support
-
-### 8.2 Web PIP
-
-- [x] `HTMLVideoElement.requestPictureInPicture()` for native browser PIP
-- [x] `document.exitPictureInPicture()` for exit
-- [x] `enterpictureinpicture`/`leavepictureinpicture` events → `AVPipChangedEvent`
-- [x] Feature detection: `document.pictureInPictureEnabled`
-
-### 8.3 Web Media Session
-
-- [x] `navigator.mediaSession.metadata = MediaMetadata(...)` with title/artist/album
-- [x] `navigator.mediaSession.setActionHandler()` for play/pause/nexttrack/previoustrack/seekto/stop
-- [x] Artwork via `MediaMetadata.artwork` (optional, URL-based)
-- [x] Custom `_SeekToActionDetails` extension type for seekto handler
-
-### 8.4 Web System Controls
-
-- [x] Volume: `HTMLMediaElement.volume` (0.0–1.0) — per-element, applied to all players as best-effort
-- [x] Wakelock: `navigator.wakeLock.request('screen')` with graceful fallback
-- [x] Brightness: N/A — returns 0.5 default (not possible in browsers)
-
-### 8.5 Web Dart-Side + Tests
-
-- [x] `AvPlayerWeb` class extending platform interface (~525 lines)
-- [x] Uses `dart:js_interop` + `package:web` exclusively (Wasm-compatible)
-- [x] 30 browser-based tests (exceeds target of 26)
-- [x] `AVVideoPlayer` updated with `HtmlElementView` for web rendering
-- [x] `AVPipOverlay` updated with `HtmlElementView` for web rendering
-
----
-
-## 5. Phase 9: Linux Implementation — DONE
-
-**Interop:** C++ native plugin (MethodChannel/EventChannel)
-**Completed:** 2026-02-13
-
-### 9.1 GStreamer Video Playback
-
-- [x] GStreamer pipeline: `playbin` element with `video-sink` to Flutter texture
-- [x] FlPixelBufferTexture rendering
-- [x] `gst_element_set_state` for play/pause
-- [x] `gst_element_seek_simple` for seek
-- [x] `GstBus` message handling → event stream
-- [x] Texture integration via `FlPixelBufferTexture`
-
-### 9.2 Linux PIP
-
-- [x] N/A — No standard Linux PIP API
-- [x] In-app PIP overlay (Dart) already works
-
-### 9.3 Linux Media Session (MPRIS)
-
-- [x] MPRIS2 D-Bus interface (`org.mpris.MediaPlayer2.Player`)
-- [x] Properties: `Metadata`, `PlaybackStatus`, `Position`
-- [x] Methods: `Play`, `Pause`, `Next`, `Previous`, `Seek`
-- [x] D-Bus signal handling → `mediaCommand` events
-
-### 9.4 Linux System Controls
-
-- [x] Volume: PulseAudio `pa_context_set_sink_volume_by_index`
-- [x] Brightness: `/sys/class/backlight/*/brightness` (sysfs)
-- [x] Wakelock: D-Bus `org.freedesktop.ScreenSaver.Inhibit`
-
-### 9.5 Linux Dart-Side + Tests
-
-- [x] `AvPlayerLinux` class extending platform interface
-- [x] MethodChannel/EventChannel integration
-- [x] 25 Dart-side tests
-
----
-
-## 6. Phase 10: Windows Implementation
+## 4. Phase 10: Windows Implementation
 
 **Interop:** `dart:ffi` (direct Win32/COM calls)
 **Priority:** Medium — Desktop support expanding
@@ -249,7 +169,7 @@ A monolithic `AVPlayerConfig` object combining `AVControlsConfig`, `AVGestureCon
 
 ---
 
-## 7. Phase 11: Integration & Widget Tests
+## 5. Phase 11: Integration & Widget Tests
 
 **Priority:** High — Should be done before stable release
 
@@ -290,7 +210,7 @@ Goal: >80% line coverage across all Dart code.
 
 ---
 
-## 8. Phase 12: Pigeon Migration
+## 6. Phase 12: Pigeon Migration
 
 **Priority:** Low — Current MethodChannel strings work fine, Pigeon adds type safety
 
@@ -318,9 +238,9 @@ Medium — Large refactor touching all 3 native plugins + 3 Dart implementations
 
 ---
 
-## 9. Future Improvements
+## 7. Future Improvements
 
-These are potential enhancements beyond the current beta roadmap:
+These are potential enhancements beyond the current roadmap:
 
 ### Performance
 
@@ -345,43 +265,37 @@ These are potential enhancements beyond the current beta roadmap:
 
 ---
 
-## 10. Execution Priority
+## 8. Execution Priority
 
 ```
-Phase 8  (Web)              ← DONE
-    ↓
 Phase 11 (Integration tests) ← High priority, needed before stable
     ↓
-Phase 9  (Linux)            ← DONE
+Phase 10 (Windows)           ← Medium priority
     ↓
-Phase 10 (Windows)          ← Medium priority
-    ↓
-Phase 12 (Pigeon migration) ← Low priority, quality-of-life
+Phase 12 (Pigeon migration)  ← Low priority, quality-of-life
 ```
-
-### Milestone: Beta Release (current)
-
-- [x] Android, iOS, macOS fully working
-- [x] 169 Dart-side tests passing
-- [x] CI/CD pipelines
-- [ ] Integration tests on real devices
 
 ### Milestone: Stable Release
 
+- [x] Android, iOS, macOS fully working
 - [x] Web support
+- [x] Linux support
+- [x] SPM support for iOS and macOS
+- [x] Single-package structure (merged federated packages)
+- [x] Published to pub.dev (v0.2.1)
+- [x] 220 Dart-side tests passing
 - [ ] Integration tests passing on Android, iOS, macOS, Web
 - [ ] Widget interaction tests
 - [ ] >80% coverage
 
 ### Milestone: Full Platform Support
 
-- [x] Linux support
 - [ ] Windows support
 - [ ] All 6 platforms tested
 
 ---
 
-## 11. Completed Phases (Reference)
+## 9. Completed Phases (Reference)
 
 | Phase | What                              | Status    | Tests |
 |-------|-----------------------------------|-----------|-------|
@@ -396,34 +310,41 @@ Phase 12 (Pigeon migration) ← Low priority, quality-of-life
 | 8     | Web native                        | Done      | 30    |
 | 9     | Linux native                      | Done      | 25    |
 
-**Total tests:** 224 across 9 test files, all passing.
+### Post-Phase Work
+
+| Release | What                                          | Date       |
+|---------|-----------------------------------------------|------------|
+| 0.2.0   | Merged 8 federated packages into single package | 2026-02-13 |
+| 0.2.1   | SPM support, iOS config updates, analysis fixes | 2026-02-14 |
+
+**Total tests:** 220 across 9 test files, all passing.
 
 ---
 
-## 12. Test Coverage
+## 10. Test Coverage
 
 ### Current Test Files
 
-| File                                                    | Tests | What's Covered                                              |
-|---------------------------------------------------------|-------|-------------------------------------------------------------|
-| `platform_interface/test/src/types_test.dart`           | 28    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums        |
-| `platform_interface/test/..._platform_interface_test.dart` | 20 | Default instance, 18 UnimplementedError verifications       |
-| `platform_interface/test/.../method_channel_..._test.dart` | 24 | All MethodChannel calls, null handling, EventChannel        |
-| `av_player/test/..._test.dart`              | 43    | State, controller, playlist, theme, presets                 |
-| `av_player_ios/test/..._test.dart`          | 26    | Registration, channel name, all 20 methods                  |
-| `av_player_android/test/..._test.dart`      | 26    | Registration, channel name, all 20 methods                  |
-| `av_player_macos/test/..._test.dart`        | 26    | Registration, channel name, all 20 methods                  |
-| `av_player_web/test/..._test.dart`          | 30    | Registration, lifecycle, playback, PIP, media session, system controls, events |
-| `av_player_linux/test/..._test.dart`    | 25    | Registration, channel name, all 20 methods (PIP N/A)        |
+| File                                              | Tests | What's Covered                                              |
+|---------------------------------------------------|-------|-------------------------------------------------------------|
+| `test/platform/types_test.dart`                   | 28    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums        |
+| `test/platform/av_player_platform_interface_test.dart` | 20 | Default instance, 18 UnimplementedError verifications       |
+| `test/platform/method_channel_av_player_test.dart` | 24   | All MethodChannel calls, null handling, EventChannel        |
+| `test/av_player_test.dart`                        | 43    | State, controller, playlist, theme, presets                 |
+| `test/platform/av_player_ios_test.dart`           | 26    | Registration, channel name, all 20 methods                  |
+| `test/platform/av_player_android_test.dart`       | 26    | Registration, channel name, all 20 methods                  |
+| `test/platform/av_player_macos_test.dart`         | 26    | Registration, channel name, all 20 methods                  |
+| `test/platform/av_player_linux_test.dart`         | 25    | Registration, channel name, all 20 methods (PIP N/A)        |
+| `test/platform/av_player_windows_test.dart`       | 2     | Registration, channel name (stub only)                      |
 
 ### Gaps
 
 - No widget interaction tests (AVControls, AVGestures, AVPipOverlay)
 - No integration tests (on-device video playback)
 - No native-side unit tests (Kotlin/Swift)
-- No windows Dart-side tests (stub only)
+- Windows Dart-side tests minimal (stub only — 2 tests)
 
 ---
 
-*Roadmap v2 — 2026-02-13*
-*Created by Claude Code for FlutterPlaza*
+*Roadmap v3 — 2026-02-14*
+*Maintained by FlutterPlaza*
