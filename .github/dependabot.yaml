@@ -6,10 +6,10 @@ updates:
     schedule:
       interval: "daily"
   - package-ecosystem: "pub"
-    directory: "/av_player"
+    directory: "/"
     schedule:
       interval: "daily"
   - package-ecosystem: "pub"
-    directory: "/av_player/example"
+    directory: "/example"
     schedule:
       interval: "daily"

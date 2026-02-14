@@ -1,4 +1,14 @@
 
+# 0.2.1
+
+## Added
+- Swift Package Manager (SPM) support for iOS and macOS
+- Both CocoaPods and SPM are supported simultaneously
+- Added SPM setup instructions to README
+
+## Fixed
+- macOS podspec version now stays in sync with the package version
+
 # 0.2.0
 
 ## Changed

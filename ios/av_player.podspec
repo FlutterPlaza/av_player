@@ -3,7 +3,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_player'
-  s.version          = '0.2.0'
+  s.version          = '0.2.1'
   s.summary          = 'iOS implementation of the av_player plugin.'
   s.description      = <<-DESC
   iOS implementation of the av_player plugin, providing native
@@ -13,7 +13,7 @@ Pod::Spec.new do |s|
   s.license          = { :type => 'BSD', :file => '../LICENSE' }
   s.author           = { 'FlutterPlaza' => 'dev@flutterplaza.com' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'av_player/Sources/av_player/**/*.swift'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
   s.frameworks = 'AVFoundation', 'AVKit', 'UIKit', 'MediaPlayer'

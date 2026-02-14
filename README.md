@@ -48,11 +48,44 @@ Built by [FlutterPlaza][flutterplaza_link].
 
 ```yaml
 dependencies:
-  av_player: ^0.2.0
+  av_player: ^0.2.1
 ```
 
 ```dart
 import 'package:av_player/av_player.dart';
+```
+
+---
+
+## iOS & macOS — Swift Package Manager
+
+This plugin supports both **CocoaPods** and **Swift Package Manager (SPM)** for iOS and macOS.
+
+### CocoaPods (default)
+
+No extra setup is required. `flutter build` uses CocoaPods automatically.
+
+### Swift Package Manager
+
+Flutter 3.24.5+ can resolve iOS and macOS dependencies through SPM instead of CocoaPods. To enable it:
+
+```bash
+flutter config --enable-swift-package-manager
+```
+
+Then build as usual:
+
+```bash
+cd example
+flutter build ios        # or: flutter build macos
+```
+
+Flutter detects the `Package.swift` files in `ios/av_player/` and `macos/av_player/` and resolves the plugin through SPM. No `Podfile` changes are needed — if SPM is enabled, Flutter prefers it; otherwise it falls back to CocoaPods.
+
+To disable SPM and return to CocoaPods:
+
+```bash
+flutter config --no-enable-swift-package-manager
 ```
 
 ---

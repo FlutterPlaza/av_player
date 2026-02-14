@@ -25,4 +25,7 @@ example/integration_test/
 coverage/
 coverage_badge.svg
 
-plan/
+plans/
+
+# Build artifacts
+build/

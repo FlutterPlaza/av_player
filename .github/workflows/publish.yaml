@@ -21,8 +21,6 @@ jobs:
       - name: Publish (dry run)
         if: ${{ inputs.dry_run }}
         run: flutter pub publish --dry-run
-        working-directory: av_player
       - name: Publish
         if: ${{ !inputs.dry_run }}
         run: flutter pub publish --force
-        working-directory: av_player

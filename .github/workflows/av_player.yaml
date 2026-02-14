@@ -8,13 +8,17 @@ on:
   pull_request:
     paths:
       - ".github/workflows/av_player.yaml"
-      - "av_player/**"
+      - "lib/**"
+      - "test/**"
+      - "pubspec.yaml"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/av_player.yaml"
-      - "av_player/**"
+      - "lib/**"
+      - "test/**"
+      - "pubspec.yaml"
 
 jobs:
   build:
@@ -25,10 +29,6 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-        working-directory: av_player
       - run: dart format --set-exit-if-changed .
-        working-directory: av_player
       - run: dart analyze --fatal-infos
-        working-directory: av_player
       - run: flutter test
-        working-directory: av_player
