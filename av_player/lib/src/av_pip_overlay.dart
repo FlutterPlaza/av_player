@@ -171,8 +171,7 @@ class _AVPipOverlayState extends State<AVPipOverlay>
                     if (textureId != null && state.isInitialized) {
                       if (kIsWeb) {
                         return HtmlElementView(
-                          viewType:
-                              'com.flutterplaza.av_pip_video_$textureId',
+                          viewType: 'com.flutterplaza.av_pip_video_$textureId',
                         );
                       }
                       return Texture(textureId: textureId);
@@ -235,8 +234,7 @@ class _AVPipOverlayState extends State<AVPipOverlay>
                 iconSize: 20,
                 icon: Icon(Icons.close, color: theme.secondaryColor),
                 padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                 onPressed: widget.onClose,
               ),
             ),

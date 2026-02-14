@@ -275,9 +275,8 @@ class AVPlaylistController extends ValueNotifier<AVPlaylistState> {
       // Restore original order
       if (_originalOrder != null) {
         final currentSource = value.currentSource;
-        final restoredIndex = currentSource != null
-            ? _originalOrder!.indexOf(currentSource)
-            : 0;
+        final restoredIndex =
+            currentSource != null ? _originalOrder!.indexOf(currentSource) : 0;
         value = value.copyWith(
           queue: List.unmodifiable(_originalOrder!),
           currentIndex: restoredIndex >= 0 ? restoredIndex : 0,

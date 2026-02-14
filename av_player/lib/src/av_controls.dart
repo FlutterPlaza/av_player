@@ -305,8 +305,7 @@ class _AVControlsState extends State<AVControls>
   // -------------------------------------------------------------------------
 
   Widget _buildBottomBar(AVPlayerState state, AVPlayerThemeData theme) {
-    final position = _dragPosition ??
-        state.position.inMilliseconds.toDouble();
+    final position = _dragPosition ?? state.position.inMilliseconds.toDouble();
     final duration = state.duration.inMilliseconds.toDouble();
     final buffered = state.buffered.inMilliseconds.toDouble();
 
@@ -409,8 +408,7 @@ class _AVControlsState extends State<AVControls>
       ),
       child: Slider(
         value: duration > 0 ? position.clamp(0, duration) : 0,
-        secondaryTrackValue:
-            duration > 0 ? buffered.clamp(0, duration) : 0,
+        secondaryTrackValue: duration > 0 ? buffered.clamp(0, duration) : 0,
         max: duration > 0 ? duration : 1,
         onChangeStart: (_) {
           _draggingSeekBar = true;
@@ -529,8 +527,7 @@ class _SpeedButton extends StatelessWidget {
               child: Text(
                 '${speed}x',
                 style: TextStyle(
-                  color:
-                      speed == currentSpeed ? accentColor : iconColor,
+                  color: speed == currentSpeed ? accentColor : iconColor,
                   fontWeight: speed == currentSpeed
                       ? FontWeight.bold
                       : FontWeight.normal,

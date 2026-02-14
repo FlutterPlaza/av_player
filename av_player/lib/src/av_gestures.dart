@@ -124,8 +124,7 @@ class _AVGesturesState extends State<AVGestures> {
                   _config.doubleTapToSeek ? () => _onDoubleTap() : null,
               onLongPressStart:
                   _config.longPressSpeed ? _onLongPressStart : null,
-              onLongPressEnd:
-                  _config.longPressSpeed ? _onLongPressEnd : null,
+              onLongPressEnd: _config.longPressSpeed ? _onLongPressEnd : null,
               onVerticalDragStart:
                   (_config.swipeToVolume || _config.swipeToBrightness)
                       ? (d) => _onVerticalDragStart(d, constraints)
@@ -220,8 +219,7 @@ class _AVGesturesState extends State<AVGestures> {
     if (constraints == null) return;
 
     final isLeftSide = _doubleTapPosition!.dx < constraints.width / 2;
-    final side =
-        isLeftSide ? _DoubleTapSide.left : _DoubleTapSide.right;
+    final side = isLeftSide ? _DoubleTapSide.left : _DoubleTapSide.right;
 
     // Accumulate consecutive double-taps on the same side
     if (side == _doubleTapSide) {
@@ -280,16 +278,13 @@ class _AVGesturesState extends State<AVGestures> {
     DragStartDetails details,
     BoxConstraints constraints,
   ) {
-    final isRightSide =
-        details.localPosition.dx > constraints.maxWidth / 2;
+    final isRightSide = details.localPosition.dx > constraints.maxWidth / 2;
     if (isRightSide && _config.swipeToVolume) {
       _swipeDirection = _SwipeDirection.volume;
       widget.controller.getSystemVolume().then((v) => _swipeStartValue = v);
     } else if (!isRightSide && _config.swipeToBrightness) {
       _swipeDirection = _SwipeDirection.brightness;
-      widget.controller
-          .getScreenBrightness()
-          .then((b) => _swipeStartValue = b);
+      widget.controller.getScreenBrightness().then((b) => _swipeStartValue = b);
     } else {
       _swipeDirection = null;
     }
@@ -377,9 +372,7 @@ class _DoubleTapRippleState extends State<_DoubleTapRipple>
       child: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: isLeft
-                ? Alignment.centerRight
-                : Alignment.centerLeft,
+            center: isLeft ? Alignment.centerRight : Alignment.centerLeft,
             radius: 0.8,
             colors: [
               widget.iconColor.withValues(alpha: 0.15),
@@ -439,8 +432,7 @@ class _SwipeIndicator extends StatelessWidget {
     final icon = direction == _SwipeDirection.volume
         ? Icons.volume_up
         : Icons.brightness_6;
-    final label =
-        direction == _SwipeDirection.volume ? 'Volume' : 'Brightness';
+    final label = direction == _SwipeDirection.volume ? 'Volume' : 'Brightness';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

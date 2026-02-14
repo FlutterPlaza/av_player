@@ -133,8 +133,7 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
   final void Function(AVMediaCommand command, {Duration? seekPosition})?
       onMediaCommand;
 
-  static AvPlayerPlatform get _platform =>
-      AvPlayerPlatform.instance;
+  static AvPlayerPlatform get _platform => AvPlayerPlatform.instance;
 
   int? _playerId;
   StreamSubscription<AVPlayerEvent>? _eventSubscription;
@@ -553,8 +552,7 @@ class _AVVideoPlayerState extends State<AVVideoPlayer>
             else if (widget.showControls)
               AVControls(
                 controller: widget.controller,
-                config:
-                    widget.controlsConfig ?? const AVControlsConfig(),
+                config: widget.controlsConfig ?? const AVControlsConfig(),
                 title: widget.title,
                 onFullscreen: widget.onFullscreen,
                 onNext: widget.onNext,

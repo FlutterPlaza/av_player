@@ -1,5 +1,5 @@
 
-# 0.2.0-beta.3
+# 0.2.0
 
 ## Changed
 - Merged 8 federated packages into a single `av_player` package

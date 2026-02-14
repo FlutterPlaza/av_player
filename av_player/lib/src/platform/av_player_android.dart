@@ -88,8 +88,7 @@ class AvPlayerAndroid extends AvPlayerPlatform {
 
   @override
   Future<bool> isPipAvailable() async {
-    final result =
-        await methodChannel.invokeMethod<bool>('isPipAvailable');
+    final result = await methodChannel.invokeMethod<bool>('isPipAvailable');
     return result ?? false;
   }
 
@@ -117,8 +116,7 @@ class AvPlayerAndroid extends AvPlayerPlatform {
 
   @override
   Future<double> getSystemVolume() async {
-    final result =
-        await methodChannel.invokeMethod<double>('getSystemVolume');
+    final result = await methodChannel.invokeMethod<double>('getSystemVolume');
     return result ?? 0.0;
   }
 
@@ -170,7 +168,6 @@ class AvPlayerAndroid extends AvPlayerPlatform {
       'com.flutterplaza.av_player_android/events/$playerId',
     )
         .receiveBroadcastStream()
-        .map((event) =>
-            AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
+        .map((event) => AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
   }
 }

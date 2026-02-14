@@ -10,8 +10,7 @@ import 'av_player_platform.dart';
 class AvPlayerLinux extends AvPlayerPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
-  final methodChannel =
-      const MethodChannel('com.flutterplaza.av_player_linux');
+  final methodChannel = const MethodChannel('com.flutterplaza.av_player_linux');
 
   /// Registers this class as the default instance of [AvPlayerPlatform].
   static void registerWith() {
@@ -114,8 +113,7 @@ class AvPlayerLinux extends AvPlayerPlatform {
 
   @override
   Future<double> getSystemVolume() async {
-    final result =
-        await methodChannel.invokeMethod<double>('getSystemVolume');
+    final result = await methodChannel.invokeMethod<double>('getSystemVolume');
     return result ?? 0.0;
   }
 
@@ -167,7 +165,6 @@ class AvPlayerLinux extends AvPlayerPlatform {
       'com.flutterplaza.av_player_linux/events/$playerId',
     )
         .receiveBroadcastStream()
-        .map((event) =>
-            AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
+        .map((event) => AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
   }
 }

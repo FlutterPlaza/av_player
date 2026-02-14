@@ -67,9 +67,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 aspectRatio: state.aspectRatio,
                 child: AVVideoPlayer.video(
                   _controller,
-                  title: _titles[_playlist.value.currentIndex.clamp(0, _titles.length - 1)],
-                  onNext: _playlist.value.hasNext ? () => _playlist.next() : null,
-                  onPrevious: _playlist.value.hasPrevious ? () => _playlist.previous() : null,
+                  title: _titles[_playlist.value.currentIndex
+                      .clamp(0, _titles.length - 1)],
+                  onNext:
+                      _playlist.value.hasNext ? () => _playlist.next() : null,
+                  onPrevious: _playlist.value.hasPrevious
+                      ? () => _playlist.previous()
+                      : null,
                 ),
               );
             },
@@ -85,15 +89,19 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   children: [
                     IconButton(
                       icon: Icon(
-                        plState.isShuffled ? Icons.shuffle_on_outlined : Icons.shuffle,
+                        plState.isShuffled
+                            ? Icons.shuffle_on_outlined
+                            : Icons.shuffle,
                       ),
-                      onPressed: () => _playlist.setShuffle(!plState.isShuffled),
+                      onPressed: () =>
+                          _playlist.setShuffle(!plState.isShuffled),
                     ),
                     IconButton(
                       icon: Icon(_repeatIcon(plState.repeatMode)),
                       onPressed: () {
                         final modes = AVRepeatMode.values;
-                        final next = modes[(plState.repeatMode.index + 1) % modes.length];
+                        final next = modes[
+                            (plState.repeatMode.index + 1) % modes.length];
                         _playlist.setRepeatMode(next);
                       },
                     ),
@@ -120,13 +128,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     return ListTile(
                       leading: Icon(
                         isCurrent ? Icons.play_arrow : Icons.music_note,
-                        color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+                        color: isCurrent
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
                       title: Text(
                         _titles[index],
                         style: TextStyle(
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                          color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+                          fontWeight:
+                              isCurrent ? FontWeight.bold : FontWeight.normal,
+                          color: isCurrent
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
                         ),
                       ),
                       onTap: () => _playlist.jumpTo(index),

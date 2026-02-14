@@ -15,8 +15,7 @@ abstract class AvPlayerPlatform extends PlatformInterface {
 
   static final Object _token = Object();
 
-  static AvPlayerPlatform _instance =
-      MethodChannelAvPlayer();
+  static AvPlayerPlatform _instance = MethodChannelAvPlayer();
 
   /// The default instance of [AvPlayerPlatform] to use.
   ///
@@ -129,14 +128,12 @@ abstract class AvPlayerPlatform extends PlatformInterface {
 
   /// Sets the screen brightness. Range: 0.0 to 1.0.
   Future<void> setScreenBrightness(double brightness) {
-    throw UnimplementedError(
-        'setScreenBrightness() has not been implemented.');
+    throw UnimplementedError('setScreenBrightness() has not been implemented.');
   }
 
   /// Returns the current screen brightness (0.0 to 1.0).
   Future<double> getScreenBrightness() {
-    throw UnimplementedError(
-        'getScreenBrightness() has not been implemented.');
+    throw UnimplementedError('getScreenBrightness() has not been implemented.');
   }
 
   /// Enables or disables wakelock (prevents screen from turning off).

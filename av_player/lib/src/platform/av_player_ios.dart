@@ -10,8 +10,7 @@ import 'av_player_platform.dart';
 class AvPlayerIOS extends AvPlayerPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
-  final methodChannel =
-      const MethodChannel('com.flutterplaza.av_player_ios');
+  final methodChannel = const MethodChannel('com.flutterplaza.av_player_ios');
 
   /// Registers this class as the default instance of [AvPlayerPlatform].
   static void registerWith() {
@@ -88,8 +87,7 @@ class AvPlayerIOS extends AvPlayerPlatform {
 
   @override
   Future<bool> isPipAvailable() async {
-    final result =
-        await methodChannel.invokeMethod<bool>('isPipAvailable');
+    final result = await methodChannel.invokeMethod<bool>('isPipAvailable');
     return result ?? false;
   }
 
@@ -117,8 +115,7 @@ class AvPlayerIOS extends AvPlayerPlatform {
 
   @override
   Future<double> getSystemVolume() async {
-    final result =
-        await methodChannel.invokeMethod<double>('getSystemVolume');
+    final result = await methodChannel.invokeMethod<double>('getSystemVolume');
     return result ?? 0.0;
   }
 
@@ -170,7 +167,6 @@ class AvPlayerIOS extends AvPlayerPlatform {
       'com.flutterplaza.av_player_ios/events/$playerId',
     )
         .receiveBroadcastStream()
-        .map((event) =>
-            AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
+        .map((event) => AVPlayerEvent.fromMap(event as Map<dynamic, dynamic>));
   }
 }

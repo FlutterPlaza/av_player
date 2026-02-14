@@ -262,7 +262,8 @@ void main() {
       expect(brightness, 0.6);
     });
 
-    test('getScreenBrightness() returns 0.5 when native returns null', () async {
+    test('getScreenBrightness() returns 0.5 when native returns null',
+        () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
         platform.methodChannel,

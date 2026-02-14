@@ -75,8 +75,7 @@ class MethodChannelAvPlayer extends AvPlayerPlatform {
 
   @override
   Future<bool> isPipAvailable() async {
-    final result =
-        await methodChannel.invokeMethod<bool>('isPipAvailable');
+    final result = await methodChannel.invokeMethod<bool>('isPipAvailable');
     return result ?? false;
   }
 
@@ -116,8 +115,7 @@ class MethodChannelAvPlayer extends AvPlayerPlatform {
 
   @override
   Future<double> getSystemVolume() async {
-    final result =
-        await methodChannel.invokeMethod<double>('getSystemVolume');
+    final result = await methodChannel.invokeMethod<double>('getSystemVolume');
     return result ?? 0.0;
   }
 
@@ -136,8 +134,7 @@ class MethodChannelAvPlayer extends AvPlayerPlatform {
 
   @override
   Future<void> setWakelock(bool enabled) {
-    return methodChannel
-        .invokeMethod('setWakelock', {'enabled': enabled});
+    return methodChannel.invokeMethod('setWakelock', {'enabled': enabled});
   }
 
   @override

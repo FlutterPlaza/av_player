@@ -32,7 +32,8 @@ void main() {
       test('is AVNetworkSource', () {
         const source = AVVideoSource.network('https://example.com/video.mp4');
         expect(source, isA<AVNetworkSource>());
-        expect((source as AVNetworkSource).url, 'https://example.com/video.mp4');
+        expect(
+            (source as AVNetworkSource).url, 'https://example.com/video.mp4');
       });
     });
 
@@ -181,7 +182,8 @@ void main() {
         'state': 'nonexistent',
       });
       expect(event, isA<AVPlaybackStateChangedEvent>());
-      expect((event as AVPlaybackStateChangedEvent).state, AVPlaybackState.idle);
+      expect(
+          (event as AVPlaybackStateChangedEvent).state, AVPlaybackState.idle);
     });
 
     test('parses bufferingUpdate event', () {
@@ -228,7 +230,8 @@ void main() {
       expect(e.code, 'NET_ERR');
     });
 
-    test('parses error event with missing message defaults to Unknown error', () {
+    test('parses error event with missing message defaults to Unknown error',
+        () {
       final event = AVPlayerEvent.fromMap({
         'type': 'error',
       });
