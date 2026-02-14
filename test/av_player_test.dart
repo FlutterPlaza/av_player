@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:av_player/av_player.dart';
-import 'package:av_player/src/platform/av_player_platform.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
