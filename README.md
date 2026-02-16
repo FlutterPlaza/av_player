@@ -157,7 +157,7 @@ AVVideoPlayer.video(
 Minimal UI for vertical short-form content (TikTok/Reels/Shorts style). Only play/pause center button with double-tap and long-press gestures. Set looping for continuous replay.
 
 <p align="center">
-  <img src="doc/gif/shorts-ezgif.com-video-to-gif-converter.gif" alt="Shorts" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/shorts-ezgif.com-video-to-gif-converter.gif" alt="Shorts" width="300"/>
 </p>
 
 ```dart
@@ -173,7 +173,7 @@ AVVideoPlayer.short(controller)
 Audio-focused controls with skip next/previous, speed, and loop. Disables PIP and fullscreen since the video surface is used for album art or visualizer.
 
 <p align="center">
-  <img src="doc/gif/music_player-ezgif.com-video-to-gif-converter.gif" alt="Music Player" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/music_player-ezgif.com-video-to-gif-converter.gif" alt="Music Player" width="300"/>
 </p>
 
 ```dart
@@ -190,7 +190,7 @@ AVVideoPlayer.music(
 Live content preset. Disables seek bar, skip buttons, and speed control since live streams cannot be seeked. Only play/pause, PIP, and fullscreen remain.
 
 <p align="center">
-  <img src="doc/gif/live_stream-ezgif.com-video-to-gif-converter.gif" alt="Live Stream" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/live_stream-ezgif.com-video-to-gif-converter.gif" alt="Live Stream" width="300"/>
 </p>
 
 ```dart
@@ -206,7 +206,7 @@ AVVideoPlayer.live(controller, title: 'LIVE')
 Uses the OS-level picture-in-picture window. Supported on Android, iOS, macOS, and Web.
 
 <p align="center">
-  <img src="doc/gif/picture_in_picture-ezgif.com-video-to-gif-converter.gif" alt="Picture-in-Picture" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/picture_in_picture-ezgif.com-video-to-gif-converter.gif" alt="Picture-in-Picture" width="300"/>
 </p>
 
 ```dart
@@ -250,7 +250,7 @@ Stack(
 Gesture controls are enabled automatically with the `.video()` and `.short()` presets. You can also configure them manually.
 
 <p align="center">
-  <img src="doc/gif/gesture_control-ezgif.com-video-to-gif-converter.gif" alt="Gesture Controls" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/gesture_control-ezgif.com-video-to-gif-converter.gif" alt="Gesture Controls" width="300"/>
 </p>
 
 | Gesture | Action |
@@ -286,7 +286,7 @@ AVVideoPlayer(
 `AVPlaylistController` manages a queue of video sources with navigation, repeat modes, and shuffle.
 
 <p align="center">
-  <img src="doc/gif/playlist-ezgif.com-video-to-gif-converter.gif" alt="Playlist" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/playlist-ezgif.com-video-to-gif-converter.gif" alt="Playlist" width="300"/>
 </p>
 
 ```dart
@@ -336,7 +336,7 @@ controller.addListener(() {
 Customize the player's appearance with `AVPlayerTheme`. All controls, gestures, and PIP overlay respect the theme.
 
 <p align="center">
-  <img src="doc/gif/theming-ezgif.com-video-to-gif-converter.gif" alt="Theming" width="300"/>
+  <img src="https://raw.githubusercontent.com/FlutterPlaza/av_player/main/doc/gif/theming-ezgif.com-video-to-gif-converter.gif" alt="Theming" width="300"/>
 </p>
 
 ```dart
