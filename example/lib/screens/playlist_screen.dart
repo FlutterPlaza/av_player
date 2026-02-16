@@ -14,17 +14,23 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   static const _sources = [
     AVVideoSource.network(
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-    ),
+        'https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4'),
+    AVVideoSource.network('https://www.w3schools.com/html/mov_bbb.mp4'),
     AVVideoSource.network(
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-    ),
+        'https://samplelib.com/lib/preview/mp4/sample-15s.mp4'),
     AVVideoSource.network(
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-    ),
+        'https://samplelib.com/lib/preview/mp4/sample-20s.mp4'),
+    AVVideoSource.network(
+        'https://samplelib.com/lib/preview/mp4/sample-30s.mp4'),
   ];
 
-  static const _titles = ['Track 1 — Bee', 'Track 2 — Bee', 'Track 3 — Bee'];
+  static const _titles = [
+    'Big Buck Bunny',
+    "Elephant's Dream",
+    'Sintel',
+    'Tears of Steel',
+    'For Bigger Fun',
+  ];
 
   @override
   void initState() {
@@ -37,21 +43,38 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   AVPlayerController _createController(AVVideoSource source) {
-    return AVPlayerController(source)
-      ..initialize().then((_) {
-        if (mounted) setState(() {});
-      });
-  }
-
-  void _onSourceChanged(AVVideoSource source) {
-    _controller.dispose();
-    _controller = _createController(source);
-    _controller.addListener(() {
-      if (_controller.value.isCompleted) {
+    final controller = AVPlayerController(source);
+    controller.initialize().then((_) {
+      if (mounted) {
+        controller.play();
+        setState(() {});
+      }
+    });
+    controller.addListener(() {
+      if (controller.value.isCompleted) {
         _playlist.onTrackCompleted();
       }
     });
+    return controller;
+  }
+
+  void _onSourceChanged(AVVideoSource source) {
+    final old = _controller;
+    _controller = _createController(source);
     setState(() {});
+    // Defer disposal so it doesn't happen during notifyListeners().
+    Future.microtask(() => old.dispose());
+  }
+
+  String _repeatLabel(AVRepeatMode mode) {
+    switch (mode) {
+      case AVRepeatMode.none:
+        return 'Repeat: Off';
+      case AVRepeatMode.one:
+        return 'Repeat: One';
+      case AVRepeatMode.all:
+        return 'Repeat: All';
+    }
   }
 
   @override
@@ -105,6 +128,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         _playlist.setRepeatMode(next);
                       },
                     ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _repeatLabel(plState.repeatMode),
+                      style:
+                          const TextStyle(color: Colors.white60, fontSize: 12),
+                    ),
                     const Spacer(),
                     Text(
                       'Track ${plState.currentIndex + 1} of ${plState.queue.length}',
@@ -126,11 +155,22 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   itemBuilder: (context, index) {
                     final isCurrent = index == plState.currentIndex;
                     return ListTile(
-                      leading: Icon(
-                        isCurrent ? Icons.play_arrow : Icons.music_note,
-                        color: isCurrent
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
+                      leading: SizedBox(
+                        width: 32,
+                        child: Center(
+                          child: isCurrent
+                              ? Icon(
+                                  Icons.equalizer,
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
+                              : Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                        ),
                       ),
                       title: Text(
                         _titles[index],
@@ -142,6 +182,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                               : null,
                         ),
                       ),
+                      subtitle: isCurrent
+                          ? Text(
+                              'Now Playing',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 12,
+                              ),
+                            )
+                          : null,
                       onTap: () => _playlist.jumpTo(index),
                     );
                   },

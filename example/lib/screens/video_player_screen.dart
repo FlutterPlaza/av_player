@@ -12,13 +12,14 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final AVPlayerController _controller;
   bool _isFullscreen = false;
+  bool _descriptionExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _controller = AVPlayerController(
       const AVVideoSource.network(
-        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+        'https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4',
       ),
     )..initialize();
   }
@@ -36,7 +37,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 aspectRatio: state.aspectRatio,
                 child: AVVideoPlayer.video(
                   _controller,
-                  title: 'Bee Video',
+                  title: 'Big Buck Bunny',
                   onFullscreen: _exitFullscreen,
                 ),
               ),
@@ -51,25 +52,114 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       body: ValueListenableBuilder<AVPlayerState>(
         valueListenable: _controller,
         builder: (context, state, _) {
-          return Column(
+          return ListView(
             children: [
               AspectRatio(
                 aspectRatio: state.aspectRatio,
                 child: AVVideoPlayer.video(
                   _controller,
-                  title: 'Bee Video',
+                  title: 'Big Buck Bunny',
                   onFullscreen: _enterFullscreen,
                 ),
               ),
+              // Title
               const Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
                 child: Text(
-                  'The .video() preset enables all controls: play/pause, '
-                  'seek, skip, speed, loop, PIP, and fullscreen. '
-                  'Gestures include double-tap to skip, long-press for 2x speed, '
-                  'and vertical swipes for volume/brightness.',
-                  style: TextStyle(color: Colors.white60),
+                  'Big Buck Bunny',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+              ),
+              // Channel row
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Blender Foundation  ·  10M views  ·  2008',
+                  style: TextStyle(color: Colors.white60, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Action row
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _ActionItem(icon: Icons.thumb_up_outlined, label: 'Like'),
+                    _ActionItem(
+                        icon: Icons.thumb_down_outlined, label: 'Dislike'),
+                    _ActionItem(icon: Icons.share_outlined, label: 'Share'),
+                    _ActionItem(icon: Icons.bookmark_border, label: 'Save'),
+                  ],
+                ),
+              ),
+              const Divider(height: 24),
+              // Expandable description
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GestureDetector(
+                  onTap: () => setState(
+                      () => _descriptionExpanded = !_descriptionExpanded),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Big Buck Bunny tells the story of a giant rabbit with a heart '
+                        'bigger than himself. When one sunny day three bullies attempt '
+                        'to harass him, something snaps and the rabbit goes on a quest '
+                        'to find and punish the offenders. This short film was made '
+                        'using Blender, a free and open-source 3D creation suite.',
+                        maxLines: _descriptionExpanded ? null : 3,
+                        overflow: _descriptionExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _descriptionExpanded ? 'Show less' : 'Show more',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 24),
+              // Up next section
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Up next',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const ListTile(
+                leading: Icon(Icons.play_circle_outline, size: 40),
+                title: Text("Elephant's Dream"),
+                subtitle: Text('Blender Foundation  ·  11M views'),
+              ),
+              const ListTile(
+                leading: Icon(Icons.play_circle_outline, size: 40),
+                title: Text('Sintel'),
+                subtitle: Text('Blender Foundation  ·  8M views'),
+              ),
+              const ListTile(
+                leading: Icon(Icons.play_circle_outline, size: 40),
+                title: Text('Tears of Steel'),
+                subtitle: Text('Blender Foundation  ·  6M views'),
               ),
             ],
           );
@@ -99,5 +189,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
+  }
+}
+
+class _ActionItem extends StatelessWidget {
+  const _ActionItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 24),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
   }
 }

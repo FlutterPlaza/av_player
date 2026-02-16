@@ -1,4 +1,22 @@
 
+# 0.3.0
+
+## Added
+- Full Windows platform implementation (stub)
+- 13 on-device integration tests (network, asset, file, PIP, playlist, volume, brightness, wakelock, multi-player)
+- 341 unit/widget tests covering controls, gestures, PIP overlay, and theming
+- CI workflow with coverage reporting (Codecov)
+- GIF demos in README for all major features
+
+## Fixed
+- macOS asset lookup bug — `Bundle.main.path(forResource:)` could not find Flutter assets in the nested `App.framework`; now constructs the correct path via `Bundle.main.bundlePath` + `lookupKey`
+- `dispose()` called during `notifyListeners()` in music player and playlist screens when track auto-advances
+- Broken Google CDN video URLs replaced with reliable alternatives
+
+## Changed
+- README updated with CI, coverage, pub points, and popularity badges
+- Consolidated CI workflows (`ci.yaml` merged into `av_player.yaml`)
+
 # 0.2.1
 
 ## Added

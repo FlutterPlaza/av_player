@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'av_player'
-  s.version          = '0.2.1'
+  s.version          = '0.3.0'
   s.summary          = 'macOS implementation of the av_player plugin.'
   s.description      = <<-DESC
   macOS implementation of av_player. Uses AVPlayer for video

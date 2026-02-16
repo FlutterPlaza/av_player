@@ -107,11 +107,16 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
                 return
             }
             let key = registrar.lookupKey(forAsset: assetPath)
-            guard let path = Bundle.main.path(forResource: key, ofType: nil) else {
+            // On macOS, lookupKey returns a path relative to the main bundle
+            // root (e.g. "Contents/Frameworks/App.framework/Resources/flutter_assets/…").
+            // Bundle.path(forResource:) cannot resolve this, so we construct
+            // the full path directly.
+            let fullPath = "\(Bundle.main.bundlePath)/\(key)"
+            guard FileManager.default.fileExists(atPath: fullPath) else {
                 result(FlutterError(code: "INVALID_SOURCE", message: "Asset not found: \(assetPath)", details: nil))
                 return
             }
-            videoURL = URL(fileURLWithPath: path)
+            videoURL = URL(fileURLWithPath: fullPath)
         case "file":
             guard let filePath = args["filePath"] as? String else {
                 result(FlutterError(code: "INVALID_SOURCE", message: "File source requires 'filePath'.", details: nil))

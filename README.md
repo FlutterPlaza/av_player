@@ -1,14 +1,16 @@
 # AV Player
 
-[![License: BSD-3-Clause][license_badge]][license_link]
 [![Pub Version][pub_badge]][pub_link]
+[![CI][ci_badge]][ci_link]
+[![codecov][codecov_badge]][codecov_link]
+[![License: BSD-3-Clause][license_badge]][license_link]
+[![Pub Points][pub_points_badge]][pub_points_link]
+[![Pub Popularity][pub_popularity_badge]][pub_link]
 [![Flutter][flutter_badge]][flutter_link]
 
 A powerful Flutter video player with **native Picture-in-Picture**, gesture controls, media notifications, playlist management, and theming — all with **zero external dependencies**. Uses native platform players directly (ExoPlayer, AVPlayer, GStreamer, HTML5 Video).
 
 Built by [FlutterPlaza][flutterplaza_link].
-
-![Home Screen](doc/images/home_screen.png)
 
 ---
 
@@ -48,7 +50,7 @@ Built by [FlutterPlaza][flutterplaza_link].
 
 ```yaml
 dependencies:
-  av_player: ^0.2.1
+  av_player: ^0.3.0
 ```
 
 ```dart
@@ -142,8 +144,6 @@ AV Player provides four presets that configure controls and gestures for differe
 
 Full controls with all features enabled: play/pause, seek bar, skip forward/backward, speed selector, loop toggle, PIP button, fullscreen button, and gesture controls.
 
-![Video Player](doc/images/video_player.png)
-
 ```dart
 AVVideoPlayer.video(
   controller,
@@ -156,7 +156,9 @@ AVVideoPlayer.video(
 
 Minimal UI for vertical short-form content (TikTok/Reels/Shorts style). Only play/pause center button with double-tap and long-press gestures. Set looping for continuous replay.
 
-![Shorts](doc/images/shorts.png)
+<p align="center">
+  <img src="doc/gif/shorts-ezgif.com-video-to-gif-converter.gif" alt="Shorts" width="300"/>
+</p>
 
 ```dart
 // Enable looping after initialization
@@ -170,7 +172,9 @@ AVVideoPlayer.short(controller)
 
 Audio-focused controls with skip next/previous, speed, and loop. Disables PIP and fullscreen since the video surface is used for album art or visualizer.
 
-![Music Player](doc/images/music_player.png)
+<p align="center">
+  <img src="doc/gif/music_player-ezgif.com-video-to-gif-converter.gif" alt="Music Player" width="300"/>
+</p>
 
 ```dart
 AVVideoPlayer.music(
@@ -185,7 +189,9 @@ AVVideoPlayer.music(
 
 Live content preset. Disables seek bar, skip buttons, and speed control since live streams cannot be seeked. Only play/pause, PIP, and fullscreen remain.
 
-![Live Stream](doc/images/live_stream.png)
+<p align="center">
+  <img src="doc/gif/live_stream-ezgif.com-video-to-gif-converter.gif" alt="Live Stream" width="300"/>
+</p>
 
 ```dart
 AVVideoPlayer.live(controller, title: 'LIVE')
@@ -199,7 +205,9 @@ AVVideoPlayer.live(controller, title: 'LIVE')
 
 Uses the OS-level picture-in-picture window. Supported on Android, iOS, macOS, and Web.
 
-![Native PIP](doc/images/pip_native.png)
+<p align="center">
+  <img src="doc/gif/picture_in_picture-ezgif.com-video-to-gif-converter.gif" alt="Picture-in-Picture" width="300"/>
+</p>
 
 ```dart
 // Enter native PIP
@@ -215,8 +223,6 @@ final available = await controller.isPipAvailable();
 ### In-App PIP Overlay
 
 A draggable, corner-snapping mini-player overlay that works on all platforms. Place it in your app's top-level `Stack`.
-
-![In-App PIP](doc/images/pip_in_app.png)
 
 ```dart
 Stack(
@@ -243,7 +249,9 @@ Stack(
 
 Gesture controls are enabled automatically with the `.video()` and `.short()` presets. You can also configure them manually.
 
-![Gesture Controls](doc/images/gestures.png)
+<p align="center">
+  <img src="doc/gif/gesture_control-ezgif.com-video-to-gif-converter.gif" alt="Gesture Controls" width="300"/>
+</p>
 
 | Gesture | Action |
 |---------|--------|
@@ -277,7 +285,9 @@ AVVideoPlayer(
 
 `AVPlaylistController` manages a queue of video sources with navigation, repeat modes, and shuffle.
 
-![Playlist](doc/images/playlist.png)
+<p align="center">
+  <img src="doc/gif/playlist-ezgif.com-video-to-gif-converter.gif" alt="Playlist" width="300"/>
+</p>
 
 ```dart
 final playlist = AVPlaylistController(
@@ -325,7 +335,9 @@ controller.addListener(() {
 
 Customize the player's appearance with `AVPlayerTheme`. All controls, gestures, and PIP overlay respect the theme.
 
-![Theming](doc/images/theming.png)
+<p align="center">
+  <img src="doc/gif/theming-ezgif.com-video-to-gif-converter.gif" alt="Theming" width="300"/>
+</p>
 
 ```dart
 AVPlayerTheme(
@@ -348,8 +360,6 @@ AVPlayerTheme(
 ## Replay
 
 When a video completes, the controls automatically show a replay icon. Tapping play (or the replay icon) seeks to the beginning and restarts playback.
-
-![Replay Icon](doc/images/replay_icon.png)
 
 ---
 
@@ -489,10 +499,17 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 This project is licensed under the BSD 3-Clause License — see the [LICENSE](LICENSE) file for details.
 
-[license_badge]: https://img.shields.io/badge/license-BSD--3--Clause-blue.svg
-[license_link]: https://opensource.org/licenses/BSD-3-Clause
 [pub_badge]: https://img.shields.io/pub/v/av_player.svg
 [pub_link]: https://pub.dev/packages/av_player
-[flutter_badge]: https://img.shields.io/badge/Flutter-3.4+-blue.svg
+[ci_badge]: https://github.com/FlutterPlaza/av_player/actions/workflows/av_player.yaml/badge.svg
+[ci_link]: https://github.com/FlutterPlaza/av_player/actions/workflows/av_player.yaml
+[codecov_badge]: https://codecov.io/gh/FlutterPlaza/av_player/branch/main/graph/badge.svg
+[codecov_link]: https://codecov.io/gh/FlutterPlaza/av_player
+[license_badge]: https://img.shields.io/badge/license-BSD--3--Clause-blue.svg
+[license_link]: https://opensource.org/licenses/BSD-3-Clause
+[pub_points_badge]: https://img.shields.io/pub/points/av_player
+[pub_points_link]: https://pub.dev/packages/av_player/score
+[pub_popularity_badge]: https://img.shields.io/pub/popularity/av_player
+[flutter_badge]: https://img.shields.io/badge/Flutter-3.22+-02569B.svg?logo=flutter
 [flutter_link]: https://flutter.dev
 [flutterplaza_link]: https://github.com/FlutterPlaza
