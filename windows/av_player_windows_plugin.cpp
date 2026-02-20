@@ -22,6 +22,7 @@
 
 #include "event_channel_handler.h"
 #include "media_player.h"
+#include "smtc_handler.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "Dxva2.lib")
@@ -238,6 +239,9 @@ class AvPlayerWindows : public flutter::Plugin {
   // Build a URI from the source map.
   std::string BuildUri(const EncodableMap& args);
 
+  // Get the top-level HWND for the Flutter window.
+  HWND GetFlutterWindowHwnd();
+
   flutter::PluginRegistrarWindows* registrar_;
 
   // Player instances keyed by texture ID.
@@ -245,6 +249,9 @@ class AvPlayerWindows : public flutter::Plugin {
 
   // Event channel handlers keyed by texture ID.
   std::map<int64_t, std::unique_ptr<EventChannelHandler>> event_handlers_;
+
+  // SMTC handlers keyed by texture ID.
+  std::map<int64_t, std::unique_ptr<SmtcHandler>> smtc_handlers_;
 };
 
 // static
@@ -271,9 +278,14 @@ AvPlayerWindows::AvPlayerWindows(flutter::PluginRegistrarWindows* registrar)
 }
 
 AvPlayerWindows::~AvPlayerWindows() {
+  smtc_handlers_.clear();
   players_.clear();
   event_handlers_.clear();
   CoUninitialize();
+}
+
+HWND AvPlayerWindows::GetFlutterWindowHwnd() {
+  return registrar_->GetView()->GetNativeWindow();
 }
 
 std::string AvPlayerWindows::BuildUri(const EncodableMap& args) {
@@ -322,10 +334,6 @@ void AvPlayerWindows::HandleMethodCall(
 
     auto* texture_registrar = registrar_->texture_registrar();
 
-    // Create event channel handler (we'll set the name after getting texture
-    // ID, but we need the handler first for MediaPlayer construction).
-    // We'll create a temporary handler, get the ID, then create properly.
-
     // Create MediaPlayer without event handler first to get texture ID.
     auto player = std::unique_ptr<MediaPlayer>(
         new MediaPlayer(texture_registrar, nullptr));
@@ -343,8 +351,9 @@ void AvPlayerWindows::HandleMethodCall(
     auto event_handler = std::make_unique<EventChannelHandler>(
         registrar_->messenger(), event_channel_name);
 
-    // Note: In a production setup we'd wire the event handler into the player.
-    // For now events flow through the handler stored in the plugin map.
+    // Wire the event handler into the player so events reach Dart.
+    player->SetEventHandler(event_handler.get());
+
     event_handlers_[texture_id] = std::move(event_handler);
     players_[texture_id] = std::move(player);
 
@@ -352,6 +361,7 @@ void AvPlayerWindows::HandleMethodCall(
 
   } else if (method == "dispose") {
     int64_t id = GetInt(args, "playerId");
+    smtc_handlers_.erase(id);
     auto it = players_.find(id);
     if (it != players_.end()) {
       it->second->Dispose();
@@ -368,6 +378,12 @@ void AvPlayerWindows::HandleMethodCall(
     if (it != players_.end()) {
       it->second->Play();
     }
+    // Update SMTC playback status
+    auto smtc_it = smtc_handlers_.find(id);
+    if (smtc_it != smtc_handlers_.end()) {
+      smtc_it->second->SetPlaybackStatus(
+          ABI::Windows::Media::MediaPlaybackStatus_Playing);
+    }
     result->Success();
 
   } else if (method == "pause") {
@@ -375,6 +391,12 @@ void AvPlayerWindows::HandleMethodCall(
     auto it = players_.find(id);
     if (it != players_.end()) {
       it->second->Pause();
+    }
+    // Update SMTC playback status
+    auto smtc_it = smtc_handlers_.find(id);
+    if (smtc_it != smtc_handlers_.end()) {
+      smtc_it->second->SetPlaybackStatus(
+          ABI::Windows::Media::MediaPlaybackStatus_Paused);
     }
     result->Success();
 
@@ -448,12 +470,39 @@ void AvPlayerWindows::HandleMethodCall(
   // ---- Media Session ----
 
   } else if (method == "setMediaMetadata") {
-    // TODO: Integrate SystemMediaTransportControls (WinRT) for now-playing
-    // metadata when building on Windows 10+.
+    int64_t id = GetInt(args, "playerId");
+    std::string title = GetString(args, "title");
+    std::string artist = GetString(args, "artist");
+    std::string album = GetString(args, "album");
+
+    auto smtc_it = smtc_handlers_.find(id);
+    if (smtc_it != smtc_handlers_.end()) {
+      smtc_it->second->SetMetadata(title, artist, album);
+    }
     result->Success();
 
   } else if (method == "setNotificationEnabled") {
-    // TODO: Enable/disable SystemMediaTransportControls.
+    int64_t id = GetInt(args, "playerId");
+    bool enabled = GetBool(args, "enabled");
+
+    if (enabled) {
+      // Create SMTC handler if it doesn't exist
+      if (smtc_handlers_.find(id) == smtc_handlers_.end()) {
+        auto smtc = std::make_unique<SmtcHandler>();
+        HWND hwnd = GetFlutterWindowHwnd();
+        EventChannelHandler* handler = nullptr;
+        auto eh_it = event_handlers_.find(id);
+        if (eh_it != event_handlers_.end()) {
+          handler = eh_it->second.get();
+        }
+        if (smtc->Initialize(hwnd, handler)) {
+          smtc_handlers_[id] = std::move(smtc);
+        }
+      }
+    } else {
+      // Destroy SMTC handler
+      smtc_handlers_.erase(id);
+    }
     result->Success();
 
   // ---- Legacy ----

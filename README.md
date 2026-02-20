@@ -36,13 +36,13 @@ Built by [FlutterPlaza][flutterplaza_link].
 
 | Feature | Android | iOS | macOS | Linux | Windows | Web |
 |---------|---------|-----|-------|-------|---------|-----|
-| Video Playback | Yes | Yes | Yes | Yes | Stub | Yes |
+| Video Playback | Yes | Yes | Yes | Yes | Yes | Yes |
 | Native PIP | Yes | Yes | Yes | — | — | Yes |
 | In-App PIP | Yes | Yes | Yes | Yes | Yes | Yes |
-| Media Notifications | Yes | Yes | — | Yes | — | Yes |
-| System Volume | Yes | Read-only | Yes | Yes | — | Per-element |
-| Brightness | Yes | Yes | Built-in only | sysfs | — | — |
-| Wakelock | Yes | Yes | Yes | Yes | — | Yes |
+| Media Notifications | Yes | Yes | — | Yes | Yes | Yes |
+| System Volume | Yes | Read-only | Yes | Yes | Yes | Per-element |
+| Brightness | Yes | Yes | Built-in only | sysfs | Monitor API | — |
+| Wakelock | Yes | Yes | Yes | Yes | Yes | Yes |
 
 ---
 
@@ -50,7 +50,7 @@ Built by [FlutterPlaza][flutterplaza_link].
 
 ```yaml
 dependencies:
-  av_player: ^0.3.0
+  av_player: ^0.4.0
 ```
 
 ```dart

@@ -2,6 +2,8 @@
 #define MEDIA_PLAYER_H_
 
 #include <windows.h>
+#include <d3d11.h>
+#include <dxgi.h>
 #include <mfapi.h>
 #include <mfidl.h>
 #include <mfmediaengine.h>
@@ -38,6 +40,9 @@ class MediaPlayer : public IMFMediaEngineNotify {
   void SetLooping(bool looping);
   void SetVolume(double volume);
 
+  // Set the event handler (can be called after construction).
+  void SetEventHandler(EventChannelHandler* handler);
+
   // Get the Flutter texture ID for this player.
   int64_t texture_id() const { return texture_id_; }
 
@@ -58,6 +63,7 @@ class MediaPlayer : public IMFMediaEngineNotify {
   void SendEvent(const std::string& type,
                  const flutter::EncodableMap& extra);
   void UpdateTexture();
+  bool CreateD3DTextures(int width, int height);
 
   flutter::TextureRegistrar* texture_registrar_;
   EventChannelHandler* event_handler_;
@@ -65,6 +71,14 @@ class MediaPlayer : public IMFMediaEngineNotify {
   // Media Foundation
   IMFMediaEngine* media_engine_ = nullptr;
   IMFMediaEngineEx* media_engine_ex_ = nullptr;
+
+  // D3D11 rendering
+  ID3D11Device* d3d_device_ = nullptr;
+  ID3D11DeviceContext* d3d_context_ = nullptr;
+  IMFDXGIDeviceManager* dxgi_manager_ = nullptr;
+  UINT dxgi_reset_token_ = 0;
+  ID3D11Texture2D* render_texture_ = nullptr;
+  ID3D11Texture2D* staging_texture_ = nullptr;
 
   // Texture
   int64_t texture_id_ = -1;
