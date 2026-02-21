@@ -228,6 +228,51 @@ data class DecoderInfoMessage (
     )
   }
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class SubtitleTrackMessage (
+  val id: String,
+  val label: String,
+  val language: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): SubtitleTrackMessage {
+      val id = pigeonVar_list[0] as String
+      val label = pigeonVar_list[1] as String
+      val language = pigeonVar_list[2] as String?
+      return SubtitleTrackMessage(id, label, language)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      id,
+      label,
+      language,
+    )
+  }
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class SelectSubtitleTrackRequest (
+  val playerId: Long,
+  val trackId: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): SelectSubtitleTrackRequest {
+      val playerId = pigeonVar_list[0] as Long
+      val trackId = pigeonVar_list[1] as String?
+      return SelectSubtitleTrackRequest(playerId, trackId)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      playerId,
+      trackId,
+    )
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -271,6 +316,16 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           DecoderInfoMessage.fromList(it)
         }
       }
+      137.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          SubtitleTrackMessage.fromList(it)
+        }
+      }
+      138.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          SelectSubtitleTrackRequest.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -308,6 +363,14 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(136)
         writeValue(stream, value.toList())
       }
+      is SubtitleTrackMessage -> {
+        stream.write(137)
+        writeValue(stream, value.toList())
+      }
+      is SelectSubtitleTrackRequest -> {
+        stream.write(138)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
@@ -336,6 +399,8 @@ interface AvPlayerHostApi {
   fun setWakelock(enabled: Boolean, callback: (Result<Unit>) -> Unit)
   fun setAbrConfig(request: SetAbrConfigRequest, callback: (Result<Unit>) -> Unit)
   fun getDecoderInfo(playerId: Long, callback: (Result<DecoderInfoMessage>) -> Unit)
+  fun getSubtitleTracks(playerId: Long, callback: (Result<List<SubtitleTrackMessage>>) -> Unit)
+  fun selectSubtitleTrack(request: SelectSubtitleTrackRequest, callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by AvPlayerHostApi. */
@@ -723,6 +788,45 @@ interface AvPlayerHostApi {
               } else {
                 val data = result.getOrNull()
                 reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.av_player.AvPlayerHostApi.getSubtitleTracks$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val playerIdArg = args[0] as Long
+            api.getSubtitleTracks(playerIdArg) { result: Result<List<SubtitleTrackMessage>> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.av_player.AvPlayerHostApi.selectSubtitleTrack$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val requestArg = args[0] as SelectSubtitleTrackRequest
+            api.selectSubtitleTrack(requestArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(null))
               }
             }
           }

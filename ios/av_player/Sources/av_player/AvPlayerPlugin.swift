@@ -271,6 +271,54 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin, AvPlayerHostApi {
     }
 
     // =========================================================================
+    // MARK: - AvPlayerHostApi: Subtitles
+    // =========================================================================
+
+    func getSubtitleTracks(playerId: Int64, completion: @escaping (Result<[SubtitleTrackMessage], Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            var tracks: [SubtitleTrackMessage] = []
+            if let group = instance.playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+                for (index, option) in group.options.enumerated() {
+                    let label = option.displayName
+                    let language = option.locale?.languageCode
+                    tracks.append(SubtitleTrackMessage(
+                        id: "embedded_\(index)",
+                        label: label,
+                        language: language
+                    ))
+                }
+            }
+            completion(.success(tracks))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    func selectSubtitleTrack(request: SelectSubtitleTrackRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(request.playerId) {
+        case .success(let instance):
+            guard let group = instance.playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+                completion(.success(()))
+                return
+            }
+
+            if let trackId = request.trackId,
+               trackId.hasPrefix("embedded_"),
+               let indexStr = trackId.split(separator: "_").last,
+               let index = Int(indexStr),
+               index < group.options.count {
+                instance.playerItem.select(group.options[index], in: group)
+            } else {
+                instance.playerItem.select(nil, in: group)
+            }
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    // =========================================================================
     // MARK: - AvPlayerHostApi: Performance
     // =========================================================================
 

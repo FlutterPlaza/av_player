@@ -8,7 +8,7 @@
 [![Pub Popularity][pub_popularity_badge]][pub_link]
 [![Flutter][flutter_badge]][flutter_link]
 
-A powerful Flutter video player with **native Picture-in-Picture**, gesture controls, media notifications, playlist management, and theming — all with **zero external dependencies**. Uses native platform players directly (ExoPlayer, AVPlayer, GStreamer, HTML5 Video).
+A powerful Flutter video player with **native Picture-in-Picture**, gesture controls, media notifications, playlist management, subtitles/captions, and theming — all with **zero external dependencies**. Uses native platform players directly (ExoPlayer, AVPlayer, GStreamer, HTML5 Video).
 
 Built by [FlutterPlaza][flutterplaza_link].
 
@@ -22,6 +22,7 @@ Built by [FlutterPlaza][flutterplaza_link].
 - **Gesture controls** — double-tap skip, swipe volume/brightness, long-press speed, horizontal swipe seek
 - **Media notifications** — lock screen and notification bar controls
 - **Playlist management** — queue, shuffle, repeat (none / one / all)
+- **Subtitles & captions** — SRT, WebVTT, embedded HLS/DASH tracks, CC button
 - **Content-type presets** — `.video()`, `.music()`, `.live()`, `.short()`
 - **Theming** — full color customization via `AVPlayerTheme`
 - **Playback speed** — 0.25x to 3.0x
@@ -40,6 +41,8 @@ Built by [FlutterPlaza][flutterplaza_link].
 | Native PIP | Yes | Yes | Yes | — | — | Yes |
 | In-App PIP | Yes | Yes | Yes | Yes | Yes | Yes |
 | Media Notifications | Yes | Yes | — | Yes | Yes | Yes |
+| Subtitles (External) | Yes | Yes | Yes | Yes | Yes | Yes |
+| Subtitles (Embedded) | Yes | Yes | Yes | — | — | Yes |
 | System Volume | Yes | Read-only | Yes | Yes | Yes | Per-element |
 | Brightness | Yes | Yes | Built-in only | sysfs | Monitor API | — |
 | Wakelock | Yes | Yes | Yes | Yes | Yes | Yes |
@@ -50,7 +53,7 @@ Built by [FlutterPlaza][flutterplaza_link].
 
 ```yaml
 dependencies:
-  av_player: ^0.4.0
+  av_player: ^0.5.0
 ```
 
 ```dart
@@ -363,6 +366,90 @@ When a video completes, the controls automatically show a replay icon. Tapping p
 
 ---
 
+## Subtitles & Captions
+
+AV Player supports both **external subtitles** (SRT/WebVTT parsed in Dart) and **embedded subtitle tracks** detected from HLS/DASH streams on supported platforms.
+
+### External Subtitles
+
+Load subtitle content from SRT or WebVTT strings. The parser auto-detects the format.
+
+```dart
+// Add subtitle tracks after initialization
+await controller.initialize();
+
+controller.addSubtitle(
+  srtContent,     // SRT or WebVTT string
+  label: 'English',
+  language: 'en',
+);
+
+controller.addSubtitle(
+  webVttContent,
+  label: 'Español',
+  language: 'es',
+);
+```
+
+### Track Selection
+
+Select a subtitle track by ID, or pass `null` to disable subtitles.
+
+```dart
+// Select a track
+final tracks = controller.subtitleTracks;
+await controller.selectSubtitleTrack(tracks.first.id);
+
+// Disable subtitles
+await controller.selectSubtitleTrack(null);
+
+// Toggle subtitles on/off
+await controller.toggleSubtitles();
+```
+
+### Subtitle Overlay
+
+The `AVVideoPlayer` widget renders subtitles automatically. Use `showSubtitles` to control visibility.
+
+```dart
+AVVideoPlayer.video(
+  controller,
+  showSubtitles: true,  // or false to hide
+)
+```
+
+The CC button in the controls bar lets users select tracks or toggle subtitles interactively.
+
+### Parsing Subtitles Directly
+
+Use `AVSubtitleParser` to parse subtitle files without a controller.
+
+```dart
+// Auto-detect format
+final cues = AVSubtitleParser.parse(content);
+
+// Or specify format
+final srtCues = AVSubtitleParser.parseSrt(srtContent);
+final vttCues = AVSubtitleParser.parseWebVtt(vttContent);
+```
+
+### Subtitle Theming
+
+Customize subtitle appearance via `AVPlayerThemeData`.
+
+```dart
+AVPlayerTheme(
+  data: const AVPlayerThemeData(
+    subtitleTextColor: Colors.yellow,
+    subtitleBackgroundColor: Color(0xCC000000),
+    subtitleFontSize: 20.0,
+  ),
+  child: AVVideoPlayer.video(controller, showSubtitles: true),
+)
+```
+
+---
+
 ## Media Notifications
 
 Display playback info on the lock screen and notification bar with media command support.
@@ -448,6 +535,9 @@ AVVideoPlayer(
 | `setScreenBrightness(double)` | Set screen brightness (0.0–1.0) |
 | `getScreenBrightness()` | Get current brightness |
 | `setWakelock(bool)` | Prevent screen from sleeping |
+| `addSubtitle(String, {label, language})` | Add external SRT/WebVTT subtitle track |
+| `selectSubtitleTrack(String?)` | Select a subtitle track (null to disable) |
+| `toggleSubtitles()` | Toggle subtitles on/off |
 | `dispose()` | Release native resources |
 
 ### AVPlayerState
@@ -467,12 +557,16 @@ AVVideoPlayer(
 | `volume` | `double` | Player volume |
 | `aspectRatio` | `double` | Video aspect ratio |
 | `errorDescription` | `String?` | Error message if failed |
+| `subtitlesEnabled` | `bool` | Whether subtitles are active |
+| `currentSubtitleCue` | `AVSubtitleCue?` | Currently displayed subtitle |
+| `availableSubtitleTracks` | `List<AVSubtitleTrack>` | Available subtitle tracks |
+| `activeSubtitleTrackId` | `String?` | ID of selected subtitle track |
 
 ---
 
 ## Example App
 
-The example app includes 8 dedicated screens showcasing each feature. Run it with:
+The example app includes 9 dedicated screens showcasing each feature. Run it with:
 
 ```bash
 cd example

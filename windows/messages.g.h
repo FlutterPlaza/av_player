@@ -327,6 +327,73 @@ class DecoderInfoMessage {
 };
 
 
+// Generated class from Pigeon that represents data sent in messages.
+class SubtitleTrackMessage {
+ public:
+  // Constructs an object setting all non-nullable fields.
+  explicit SubtitleTrackMessage(
+    const std::string& id,
+    const std::string& label);
+
+  // Constructs an object setting all fields.
+  explicit SubtitleTrackMessage(
+    const std::string& id,
+    const std::string& label,
+    const std::string* language);
+
+  const std::string& id() const;
+  void set_id(std::string_view value_arg);
+
+  const std::string& label() const;
+  void set_label(std::string_view value_arg);
+
+  const std::string* language() const;
+  void set_language(const std::string_view* value_arg);
+  void set_language(std::string_view value_arg);
+
+
+ private:
+  static SubtitleTrackMessage FromEncodableList(const flutter::EncodableList& list);
+  flutter::EncodableList ToEncodableList() const;
+  friend class AvPlayerHostApi;
+  friend class PigeonInternalCodecSerializer;
+  std::string id_;
+  std::string label_;
+  std::optional<std::string> language_;
+
+};
+
+
+// Generated class from Pigeon that represents data sent in messages.
+class SelectSubtitleTrackRequest {
+ public:
+  // Constructs an object setting all non-nullable fields.
+  explicit SelectSubtitleTrackRequest(int64_t player_id);
+
+  // Constructs an object setting all fields.
+  explicit SelectSubtitleTrackRequest(
+    int64_t player_id,
+    const std::string* track_id);
+
+  int64_t player_id() const;
+  void set_player_id(int64_t value_arg);
+
+  const std::string* track_id() const;
+  void set_track_id(const std::string_view* value_arg);
+  void set_track_id(std::string_view value_arg);
+
+
+ private:
+  static SelectSubtitleTrackRequest FromEncodableList(const flutter::EncodableList& list);
+  flutter::EncodableList ToEncodableList() const;
+  friend class AvPlayerHostApi;
+  friend class PigeonInternalCodecSerializer;
+  int64_t player_id_;
+  std::optional<std::string> track_id_;
+
+};
+
+
 class PigeonInternalCodecSerializer : public flutter::StandardCodecSerializer {
  public:
   PigeonInternalCodecSerializer();
@@ -411,6 +478,12 @@ class AvPlayerHostApi {
   virtual void GetDecoderInfo(
     int64_t player_id,
     std::function<void(ErrorOr<DecoderInfoMessage> reply)> result) = 0;
+  virtual void GetSubtitleTracks(
+    int64_t player_id,
+    std::function<void(ErrorOr<flutter::EncodableList> reply)> result) = 0;
+  virtual void SelectSubtitleTrack(
+    const SelectSubtitleTrackRequest& request,
+    std::function<void(std::optional<FlutterError> reply)> result) = 0;
 
   // The codec used by AvPlayerHostApi.
   static const flutter::StandardMessageCodec& GetCodec();

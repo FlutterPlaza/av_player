@@ -231,6 +231,41 @@ class AvPlayerWeb extends AvPlayerPlatform {
   }
 
   // ===========================================================================
+  // Subtitles
+  // ===========================================================================
+
+  @override
+  Future<List<AVSubtitleTrack>> getSubtitleTracks(int playerId) async {
+    final player = _players[playerId];
+    if (player == null) return [];
+
+    final tracks = <AVSubtitleTrack>[];
+    final textTracks = player.videoElement.textTracks;
+    for (var i = 0; i < textTracks.length; i++) {
+      final track = textTracks[i];
+      tracks.add(AVSubtitleTrack(
+        id: 'web_$i',
+        label: track.label.isNotEmpty ? track.label : 'Track ${i + 1}',
+        language: track.language.isNotEmpty ? track.language : null,
+        isEmbedded: true,
+      ));
+    }
+    return tracks;
+  }
+
+  @override
+  Future<void> selectSubtitleTrack(int playerId, String? trackId) async {
+    final player = _players[playerId];
+    if (player == null) return;
+
+    final textTracks = player.videoElement.textTracks;
+    for (var i = 0; i < textTracks.length; i++) {
+      final track = textTracks[i];
+      track.mode = (trackId == 'web_$i') ? 'showing' : 'disabled';
+    }
+  }
+
+  // ===========================================================================
   // Events
   // ===========================================================================
 

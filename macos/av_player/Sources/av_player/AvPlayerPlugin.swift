@@ -238,6 +238,53 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin, AvPlayerHostApi {
     }
 
     // =========================================================================
+    // MARK: - AvPlayerHostApi — Subtitles
+    // =========================================================================
+
+    func getSubtitleTracks(playerId: Int64, completion: @escaping (Result<[SubtitleTrackMessage], Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
+            return
+        }
+        var tracks: [SubtitleTrackMessage] = []
+        if let group = instance.playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+            for (index, option) in group.options.enumerated() {
+                let label = option.displayName
+                let language = option.locale?.languageCode
+                tracks.append(SubtitleTrackMessage(
+                    id: "embedded_\(index)",
+                    label: label,
+                    language: language
+                ))
+            }
+        }
+        completion(.success(tracks))
+    }
+
+    func selectSubtitleTrack(request: SelectSubtitleTrackRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[request.playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(request.playerId) not found.", details: nil)))
+            return
+        }
+
+        guard let group = instance.playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            completion(.success(()))
+            return
+        }
+
+        if let trackId = request.trackId,
+           trackId.hasPrefix("embedded_"),
+           let indexStr = trackId.split(separator: "_").last,
+           let index = Int(indexStr),
+           index < group.options.count {
+            instance.playerItem.select(group.options[index], in: group)
+        } else {
+            instance.playerItem.select(nil, in: group)
+        }
+        completion(.success(()))
+    }
+
+    // =========================================================================
     // MARK: - AvPlayerHostApi — Performance
     // =========================================================================
 

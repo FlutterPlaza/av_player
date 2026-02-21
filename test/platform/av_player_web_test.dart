@@ -284,6 +284,25 @@ void main() {
     });
 
     // =========================================================================
+    // Subtitles
+    // =========================================================================
+
+    test('getSubtitleTracks() returns list for valid player', () async {
+      final id = await plugin.create(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      final tracks = await plugin.getSubtitleTracks(id);
+      expect(tracks, isA<List<AVSubtitleTrack>>());
+    });
+
+    test('selectSubtitleTrack() completes for valid player', () async {
+      final id = await plugin.create(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await expectLater(plugin.selectSubtitleTrack(id, null), completes);
+    });
+
+    // =========================================================================
     // Events
     // =========================================================================
 

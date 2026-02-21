@@ -150,6 +150,43 @@ class AVDecoderInfo {
 enum AVMemoryPressureLevel { normal, warning, critical }
 
 // ---------------------------------------------------------------------------
+// Subtitles
+// ---------------------------------------------------------------------------
+
+/// Supported subtitle file formats.
+enum AVSubtitleFormat { srt, webvtt }
+
+/// A single subtitle cue with start/end times and text content.
+@immutable
+class AVSubtitleCue {
+  const AVSubtitleCue({
+    required this.startTime,
+    required this.endTime,
+    required this.text,
+  });
+
+  final Duration startTime;
+  final Duration endTime;
+  final String text;
+}
+
+/// A subtitle track (either embedded in the media or added externally).
+@immutable
+class AVSubtitleTrack {
+  const AVSubtitleTrack({
+    required this.id,
+    required this.label,
+    this.language,
+    this.isEmbedded = false,
+  });
+
+  final String id;
+  final String label;
+  final String? language;
+  final bool isEmbedded;
+}
+
+// ---------------------------------------------------------------------------
 // Player events
 // ---------------------------------------------------------------------------
 
@@ -206,6 +243,27 @@ sealed class AVPlayerEvent {
             (l) => l.name == map['level'],
             orElse: () => AVMemoryPressureLevel.normal,
           ),
+        ),
+      'subtitleTracksChanged' => AVSubtitleTracksChangedEvent(
+          tracks: (map['tracks'] as List<dynamic>).map((t) {
+            final m = t as Map<dynamic, dynamic>;
+            return AVSubtitleTrack(
+              id: m['id'] as String,
+              label: m['label'] as String,
+              language: m['language'] as String?,
+              isEmbedded: true,
+            );
+          }).toList(),
+        ),
+      'subtitleCue' => AVSubtitleCueEvent(
+          cue: map['text'] != null
+              ? AVSubtitleCue(
+                  startTime:
+                      Duration(milliseconds: map['startTime'] as int? ?? 0),
+                  endTime: Duration(milliseconds: map['endTime'] as int? ?? 0),
+                  text: map['text'] as String,
+                )
+              : null,
         ),
       _ => AVErrorEvent(message: 'Unknown event type: $type'),
     };
@@ -286,6 +344,18 @@ class AVAbrInfoEvent extends AVPlayerEvent {
 class AVMemoryPressureEvent extends AVPlayerEvent {
   const AVMemoryPressureEvent({required this.level});
   final AVMemoryPressureLevel level;
+}
+
+/// Native detected embedded subtitle tracks.
+class AVSubtitleTracksChangedEvent extends AVPlayerEvent {
+  const AVSubtitleTracksChangedEvent({required this.tracks});
+  final List<AVSubtitleTrack> tracks;
+}
+
+/// Active subtitle cue from native (null = cleared).
+class AVSubtitleCueEvent extends AVPlayerEvent {
+  const AVSubtitleCueEvent({this.cue});
+  final AVSubtitleCue? cue;
 }
 
 // ---------------------------------------------------------------------------

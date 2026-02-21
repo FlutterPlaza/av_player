@@ -79,6 +79,17 @@ class _MockPlatform extends AvPlayerPlatform {
   Future<void> setWakelock(bool enabled) async => log.add('setWakelock');
 
   @override
+  Future<List<AVSubtitleTrack>> getSubtitleTracks(int playerId) async {
+    log.add('getSubtitleTracks');
+    return [];
+  }
+
+  @override
+  Future<void> selectSubtitleTrack(int playerId, String? trackId) async {
+    log.add('selectSubtitleTrack');
+  }
+
+  @override
   Stream<AVPlayerEvent> playerEvents(int playerId) {
     _eventController = StreamController<AVPlayerEvent>();
     return _eventController!.stream;
@@ -338,6 +349,119 @@ void main() {
       await controller.initialize();
       controller.dispose();
       expect(mockPlatform.log, contains('dispose'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Subtitles
+  // ---------------------------------------------------------------------------
+
+  group('AVPlayerController subtitles', () {
+    test('addSubtitle() parses content and updates tracks', () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      controller.addSubtitle(
+        '1\n00:00:01,000 --> 00:00:04,000\nHello\n',
+        label: 'English',
+        language: 'en',
+      );
+      expect(controller.value.availableSubtitleTracks, hasLength(1));
+      expect(controller.value.availableSubtitleTracks[0].label, 'English');
+      expect(controller.value.availableSubtitleTracks[0].language, 'en');
+      expect(controller.value.availableSubtitleTracks[0].isEmbedded, false);
+      controller.dispose();
+    });
+
+    test('selectSubtitleTrack() enables subtitles for external track',
+        () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      controller.addSubtitle(
+        '1\n00:00:01,000 --> 00:00:04,000\nHello\n',
+        label: 'English',
+      );
+      final trackId = controller.value.availableSubtitleTracks[0].id;
+      await controller.selectSubtitleTrack(trackId);
+      expect(controller.value.subtitlesEnabled, true);
+      expect(controller.value.activeSubtitleTrackId, trackId);
+      controller.dispose();
+    });
+
+    test('selectSubtitleTrack(null) disables subtitles', () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      controller.addSubtitle(
+        '1\n00:00:01,000 --> 00:00:04,000\nHello\n',
+        label: 'English',
+      );
+      final trackId = controller.value.availableSubtitleTracks[0].id;
+      await controller.selectSubtitleTrack(trackId);
+      await controller.selectSubtitleTrack(null);
+      expect(controller.value.subtitlesEnabled, false);
+      expect(controller.value.activeSubtitleTrackId, isNull);
+      controller.dispose();
+    });
+
+    test('toggleSubtitles() toggles on and off', () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      controller.addSubtitle(
+        '1\n00:00:01,000 --> 00:00:04,000\nHello\n',
+        label: 'English',
+      );
+      await controller.toggleSubtitles();
+      expect(controller.value.subtitlesEnabled, true);
+      await controller.toggleSubtitles();
+      expect(controller.value.subtitlesEnabled, false);
+      controller.dispose();
+    });
+
+    test('handles subtitleTracksChanged event from native', () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      mockPlatform.emitEvent(const AVSubtitleTracksChangedEvent(tracks: [
+        AVSubtitleTrack(
+            id: 'native_0', label: 'English', language: 'en', isEmbedded: true),
+      ]));
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.value.availableSubtitleTracks, hasLength(1));
+      expect(controller.value.availableSubtitleTracks[0].isEmbedded, true);
+      controller.dispose();
+    });
+
+    test('handles subtitleCue event for embedded track', () async {
+      final controller = AVPlayerController(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await controller.initialize();
+      // Simulate embedded track being selected
+      mockPlatform.emitEvent(const AVSubtitleTracksChangedEvent(tracks: [
+        AVSubtitleTrack(
+            id: 'native_0', label: 'English', language: 'en', isEmbedded: true),
+      ]));
+      await Future<void>.delayed(Duration.zero);
+      await controller.selectSubtitleTrack('native_0');
+      mockPlatform.emitEvent(const AVSubtitleCueEvent(
+        cue: AVSubtitleCue(
+          startTime: Duration(seconds: 1),
+          endTime: Duration(seconds: 4),
+          text: 'Hello from native',
+        ),
+      ));
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.value.currentSubtitleCue, isNotNull);
+      expect(controller.value.currentSubtitleCue!.text, 'Hello from native');
+      controller.dispose();
     });
   });
 

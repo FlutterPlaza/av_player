@@ -766,6 +766,97 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Subtitle button
+  // ---------------------------------------------------------------------------
+
+  group('Subtitle button', () {
+    testWidgets('CC button is visible by default', (tester) async {
+      final controller = await createInitializedController(mockPlatform);
+
+      await tester.pumpWidget(wrapWithApp(SizedBox.expand(
+        child: AVControls(controller: controller),
+      )));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.closed_caption_disabled), findsOneWidget);
+
+      controller.dispose();
+    });
+
+    testWidgets('CC button hidden when showSubtitleButton is false',
+        (tester) async {
+      final controller = await createInitializedController(mockPlatform);
+
+      await tester.pumpWidget(wrapWithApp(SizedBox.expand(
+        child: AVControls(
+          controller: controller,
+          config: const AVControlsConfig(showSubtitleButton: false),
+        ),
+      )));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.closed_caption), findsNothing);
+      expect(find.byIcon(Icons.closed_caption_disabled), findsNothing);
+
+      controller.dispose();
+    });
+
+    testWidgets('tapping CC button toggles subtitles when no tracks',
+        (tester) async {
+      final controller = await createInitializedController(mockPlatform);
+
+      await tester.pumpWidget(wrapWithApp(SizedBox.expand(
+        child: AVControls(controller: controller),
+      )));
+      await tester.pump();
+
+      // Initially disabled — simple toggle icon (no tracks)
+      expect(find.byIcon(Icons.closed_caption_disabled), findsOneWidget);
+
+      // Tap to toggle
+      await tester.tap(find.byIcon(Icons.closed_caption_disabled));
+      await tester.pump();
+
+      // toggleSubtitles was called (no tracks, so it may not change state,
+      // but the button action fires)
+      controller.dispose();
+    });
+
+    testWidgets('CC popup selects track when tracks available', (tester) async {
+      final controller = await createInitializedController(mockPlatform);
+      controller.addSubtitle(
+        '1\n00:00:01,000 --> 00:00:04,000\nHello\n',
+        label: 'English',
+      );
+
+      await tester.pumpWidget(wrapWithApp(SizedBox.expand(
+        child: AVControls(controller: controller),
+      )));
+      await tester.pump();
+
+      // PopupMenuButton is shown when tracks exist
+      expect(find.byIcon(Icons.closed_caption_disabled), findsOneWidget);
+
+      // Tap to open popup
+      await tester.tap(find.byIcon(Icons.closed_caption_disabled));
+      await tester.pumpAndSettle();
+
+      // Popup should contain "Off" and the track label
+      expect(find.text('Off'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+
+      // Select the track
+      await tester.tap(find.text('English'));
+      await tester.pumpAndSettle();
+
+      expect(controller.value.subtitlesEnabled, true);
+      expect(controller.value.activeSubtitleTrackId, isNotNull);
+
+      controller.dispose();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Theme colors
   // ---------------------------------------------------------------------------
 

@@ -120,6 +120,23 @@ class DecoderInfoMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Subtitle data classes
+// ---------------------------------------------------------------------------
+
+class SubtitleTrackMessage {
+  SubtitleTrackMessage({required this.id, required this.label, this.language});
+  final String id;
+  final String label;
+  final String? language;
+}
+
+class SelectSubtitleTrackRequest {
+  SelectSubtitleTrackRequest({required this.playerId, this.trackId});
+  final int playerId;
+  final String? trackId; // null = disable subtitles
+}
+
+// ---------------------------------------------------------------------------
 // Host API
 // ---------------------------------------------------------------------------
 
@@ -190,4 +207,11 @@ abstract class AvPlayerHostApi {
 
   @async
   DecoderInfoMessage getDecoderInfo(int playerId);
+
+  // Subtitles
+  @async
+  List<SubtitleTrackMessage> getSubtitleTracks(int playerId);
+
+  @async
+  void selectSubtitleTrack(SelectSubtitleTrackRequest request);
 }

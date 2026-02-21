@@ -149,6 +149,31 @@ class PigeonAvPlayer extends AvPlayerPlatform {
   }
 
   // ===========================================================================
+  // Subtitles
+  // ===========================================================================
+
+  @override
+  Future<List<AVSubtitleTrack>> getSubtitleTracks(int playerId) async {
+    final messages = await _api.getSubtitleTracks(playerId);
+    return messages
+        .map((msg) => AVSubtitleTrack(
+              id: msg.id,
+              label: msg.label,
+              language: msg.language,
+              isEmbedded: true,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<void> selectSubtitleTrack(int playerId, String? trackId) {
+    return _api.selectSubtitleTrack(SelectSubtitleTrackRequest(
+      playerId: playerId,
+      trackId: trackId,
+    ));
+  }
+
+  // ===========================================================================
   // Events (manual EventChannel — Pigeon doesn't generate these)
   // ===========================================================================
 

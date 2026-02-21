@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import 'src/av_controls.dart';
 import 'src/av_gestures.dart';
+import 'src/av_subtitle_overlay.dart';
 import 'src/platform/av_player_platform.dart';
+import 'src/subtitle_parser.dart';
 
 // Re-export types from platform interface so users only need one import.
 export 'src/platform/av_player_platform.dart'
@@ -30,7 +32,15 @@ export 'src/platform/av_player_platform.dart'
         AVDecoderInfo,
         AVMemoryPressureLevel,
         AVAbrInfoEvent,
-        AVMemoryPressureEvent;
+        AVMemoryPressureEvent,
+        AVSubtitleCue,
+        AVSubtitleTrack,
+        AVSubtitleFormat,
+        AVSubtitleTracksChangedEvent,
+        AVSubtitleCueEvent;
+
+export 'src/subtitle_parser.dart' show AVSubtitleParser;
+export 'src/av_subtitle_overlay.dart';
 
 /// View type prefix for the web platform view. Must match the prefix
 /// used in [AvPlayerWeb] to register the `<video>` element.
@@ -59,6 +69,10 @@ class AVPlayerState {
     this.errorDescription,
     this.currentBitrateKbps,
     this.memoryPressureLevel,
+    this.currentSubtitleCue,
+    this.availableSubtitleTracks = const [],
+    this.activeSubtitleTrackId,
+    this.subtitlesEnabled = false,
   });
 
   final Duration position;
@@ -76,6 +90,10 @@ class AVPlayerState {
   final String? errorDescription;
   final int? currentBitrateKbps;
   final AVMemoryPressureLevel? memoryPressureLevel;
+  final AVSubtitleCue? currentSubtitleCue;
+  final List<AVSubtitleTrack> availableSubtitleTracks;
+  final String? activeSubtitleTrackId;
+  final bool subtitlesEnabled;
 
   bool get hasError => errorDescription != null;
 
@@ -95,6 +113,13 @@ class AVPlayerState {
     String? errorDescription,
     int? currentBitrateKbps,
     AVMemoryPressureLevel? memoryPressureLevel,
+    AVSubtitleCue? currentSubtitleCue,
+    List<AVSubtitleTrack>? availableSubtitleTracks,
+    String? activeSubtitleTrackId,
+    bool? subtitlesEnabled,
+    // Sentinel to allow clearing nullable fields
+    bool clearSubtitleCue = false,
+    bool clearActiveSubtitleTrackId = false,
   }) {
     return AVPlayerState(
       position: position ?? this.position,
@@ -112,6 +137,15 @@ class AVPlayerState {
       errorDescription: errorDescription ?? this.errorDescription,
       currentBitrateKbps: currentBitrateKbps ?? this.currentBitrateKbps,
       memoryPressureLevel: memoryPressureLevel ?? this.memoryPressureLevel,
+      currentSubtitleCue: clearSubtitleCue
+          ? null
+          : (currentSubtitleCue ?? this.currentSubtitleCue),
+      availableSubtitleTracks:
+          availableSubtitleTracks ?? this.availableSubtitleTracks,
+      activeSubtitleTrackId: clearActiveSubtitleTrackId
+          ? null
+          : (activeSubtitleTrackId ?? this.activeSubtitleTrackId),
+      subtitlesEnabled: subtitlesEnabled ?? this.subtitlesEnabled,
     );
   }
 }
@@ -150,6 +184,11 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
 
   int? _playerId;
   StreamSubscription<AVPlayerEvent>? _eventSubscription;
+
+  // Subtitle state
+  final List<AVSubtitleTrack> _externalTracks = [];
+  final Map<String, List<AVSubtitleCue>> _externalCues = {};
+  Timer? _subtitleSyncTimer;
 
   /// The texture ID used to render the video frame.
   /// Null until [initialize] completes successfully.
@@ -219,6 +258,19 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
         value = value.copyWith(memoryPressureLevel: level);
         if (level == AVMemoryPressureLevel.critical) {
           _applyMemoryPressureReduction();
+        }
+      case AVSubtitleTracksChangedEvent(:final tracks):
+        final merged = [...tracks, ..._externalTracks];
+        value = value.copyWith(availableSubtitleTracks: merged);
+      case AVSubtitleCueEvent(:final cue):
+        // Only update if an embedded track is active
+        final activeId = value.activeSubtitleTrackId;
+        if (activeId != null && !_externalCues.containsKey(activeId)) {
+          if (cue != null) {
+            value = value.copyWith(currentSubtitleCue: cue);
+          } else {
+            value = value.copyWith(clearSubtitleCue: true);
+          }
         }
     }
   }
@@ -348,8 +400,135 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
     return _platform.getDecoderInfo(id);
   }
 
+  // ===========================================================================
+  // Subtitles
+  // ===========================================================================
+
+  /// The currently available subtitle tracks (both embedded and external).
+  List<AVSubtitleTrack> get subtitleTracks => value.availableSubtitleTracks;
+
+  /// Adds an external subtitle from parsed content (SRT or WebVTT).
+  ///
+  /// The content is parsed immediately. The resulting track is added to
+  /// [subtitleTracks] and can be selected via [selectSubtitleTrack].
+  void addSubtitle(String content, {required String label, String? language}) {
+    final cues = AVSubtitleParser.parse(content);
+    final trackId = 'external_${_externalTracks.length}';
+    final track = AVSubtitleTrack(
+      id: trackId,
+      label: label,
+      language: language,
+    );
+    _externalTracks.add(track);
+    _externalCues[trackId] = cues;
+
+    // Merge with any embedded tracks
+    final embedded =
+        value.availableSubtitleTracks.where((t) => t.isEmbedded).toList();
+    value = value.copyWith(
+      availableSubtitleTracks: [...embedded, ..._externalTracks],
+    );
+  }
+
+  /// Selects a subtitle track by ID. Pass null to disable subtitles.
+  ///
+  /// For embedded tracks, delegates to the native platform.
+  /// For external tracks, starts a sync timer that matches cues to position.
+  Future<void> selectSubtitleTrack(String? trackId) async {
+    final id = _playerId;
+
+    _subtitleSyncTimer?.cancel();
+    _subtitleSyncTimer = null;
+
+    if (trackId == null) {
+      // Disable subtitles
+      if (id != null) {
+        try {
+          await _platform.selectSubtitleTrack(id, null);
+        } catch (_) {
+          // Platform may not support embedded subtitles
+        }
+      }
+      value = value.copyWith(
+        clearActiveSubtitleTrackId: true,
+        clearSubtitleCue: true,
+        subtitlesEnabled: false,
+      );
+      return;
+    }
+
+    if (_externalCues.containsKey(trackId)) {
+      // External track — use Dart-side sync
+      value = value.copyWith(
+        activeSubtitleTrackId: trackId,
+        subtitlesEnabled: true,
+      );
+      _startSubtitleSync(trackId);
+    } else {
+      // Embedded track — delegate to native
+      if (id != null) {
+        try {
+          await _platform.selectSubtitleTrack(id, trackId);
+        } catch (_) {
+          // Platform may not support embedded subtitles
+        }
+      }
+      value = value.copyWith(
+        activeSubtitleTrackId: trackId,
+        subtitlesEnabled: true,
+      );
+    }
+  }
+
+  /// Toggles subtitles on/off.
+  ///
+  /// When toggling on, reuses the last active track or selects the first available.
+  Future<void> toggleSubtitles() async {
+    if (value.subtitlesEnabled) {
+      await selectSubtitleTrack(null);
+    } else {
+      final tracks = value.availableSubtitleTracks;
+      if (tracks.isNotEmpty) {
+        final trackId = value.activeSubtitleTrackId ?? tracks.first.id;
+        await selectSubtitleTrack(trackId);
+      }
+    }
+  }
+
+  void _startSubtitleSync(String trackId) {
+    _subtitleSyncTimer?.cancel();
+    _subtitleSyncTimer = Timer.periodic(
+      const Duration(milliseconds: 100),
+      (_) => _updateExternalCue(trackId),
+    );
+  }
+
+  void _updateExternalCue(String trackId) {
+    final cues = _externalCues[trackId];
+    if (cues == null) return;
+
+    final position = value.position;
+    AVSubtitleCue? active;
+    for (final cue in cues) {
+      if (position >= cue.startTime && position < cue.endTime) {
+        active = cue;
+        break;
+      }
+      if (cue.startTime > position) break; // cues are sorted
+    }
+
+    if (active != value.currentSubtitleCue) {
+      if (active != null) {
+        value = value.copyWith(currentSubtitleCue: active);
+      } else {
+        value = value.copyWith(clearSubtitleCue: true);
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _subtitleSyncTimer?.cancel();
     _eventSubscription?.cancel();
     final id = _playerId;
     if (id != null) {
@@ -384,6 +563,7 @@ class AVVideoPlayer extends StatefulWidget {
     this.controller, {
     super.key,
     this.showControls = false,
+    this.showSubtitles,
     this.controlsConfig,
     this.controlsBuilder,
     this.gestureConfig,
@@ -402,6 +582,7 @@ class AVVideoPlayer extends StatefulWidget {
     this.controller, {
     super.key,
     this.title,
+    this.showSubtitles,
     this.onFullscreen,
     this.onNext,
     this.onPrevious,
@@ -437,6 +618,7 @@ class AVVideoPlayer extends StatefulWidget {
     this.controller, {
     super.key,
     this.title,
+    this.showSubtitles,
     this.onNext,
     this.onPrevious,
     this.controlsBuilder,
@@ -465,6 +647,7 @@ class AVVideoPlayer extends StatefulWidget {
     this.controller, {
     super.key,
     this.title,
+    this.showSubtitles,
     this.onFullscreen,
     this.controlsBuilder,
     AVControlsConfig? controlsConfig,
@@ -493,6 +676,7 @@ class AVVideoPlayer extends StatefulWidget {
     this.controller, {
     super.key,
     this.title,
+    this.showSubtitles,
     this.onNext,
     this.onPrevious,
     this.controlsBuilder,
@@ -518,6 +702,9 @@ class AVVideoPlayer extends StatefulWidget {
 
   /// Whether to show the built-in controls overlay. Defaults to `false`.
   final bool showControls;
+
+  /// Whether to show subtitles. When null, falls back to [AVPlayerState.subtitlesEnabled].
+  final bool? showSubtitles;
 
   /// Configuration for the built-in controls. Only used when [showControls] is true.
   final AVControlsConfig? controlsConfig;
@@ -582,11 +769,17 @@ class _AVVideoPlayerState extends State<AVVideoPlayer>
           return videoLayer;
         }
 
-        // Enhanced mode: video + gestures + controls in a stack
+        // Enhanced mode: video + subtitles + gestures + controls in a stack
+        final showSubs = widget.showSubtitles ?? state.subtitlesEnabled;
         return Stack(
           fit: StackFit.expand,
           children: [
             videoLayer,
+            if (showSubs)
+              AVSubtitleOverlay(
+                currentCue: state.currentSubtitleCue,
+                bottomPadding: widget.showControls ? 80 : 16,
+              ),
             if (widget.gestureConfig != null)
               AVGestures(
                 controller: widget.controller,

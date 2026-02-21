@@ -156,6 +156,20 @@ abstract class AvPlayerPlatform extends PlatformInterface {
   }
 
   // ===========================================================================
+  // Subtitles
+  // ===========================================================================
+
+  /// Returns the available embedded subtitle tracks for [playerId].
+  Future<List<AVSubtitleTrack>> getSubtitleTracks(int playerId) {
+    throw UnimplementedError('getSubtitleTracks() has not been implemented.');
+  }
+
+  /// Selects a subtitle track by [trackId], or disables subtitles if null.
+  Future<void> selectSubtitleTrack(int playerId, String? trackId) {
+    throw UnimplementedError('selectSubtitleTrack() has not been implemented.');
+  }
+
+  // ===========================================================================
   // Events
   // ===========================================================================
 

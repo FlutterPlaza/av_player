@@ -270,6 +270,58 @@ struct DecoderInfoMessage {
   }
 }
 
+/// Generated class from Pigeon that represents data sent in messages.
+struct SubtitleTrackMessage {
+  var id: String
+  var label: String
+  var language: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> SubtitleTrackMessage? {
+    let id = pigeonVar_list[0] as! String
+    let label = pigeonVar_list[1] as! String
+    let language: String? = nilOrValue(pigeonVar_list[2])
+
+    return SubtitleTrackMessage(
+      id: id,
+      label: label,
+      language: language
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      id,
+      label,
+      language,
+    ]
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct SelectSubtitleTrackRequest {
+  var playerId: Int64
+  var trackId: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> SelectSubtitleTrackRequest? {
+    let playerId = pigeonVar_list[0] as! Int64
+    let trackId: String? = nilOrValue(pigeonVar_list[1])
+
+    return SelectSubtitleTrackRequest(
+      playerId: playerId,
+      trackId: trackId
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      playerId,
+      trackId,
+    ]
+  }
+}
+
 private class MessagesPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
@@ -293,6 +345,10 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
       return SetAbrConfigRequest.fromList(self.readValue() as! [Any?])
     case 136:
       return DecoderInfoMessage.fromList(self.readValue() as! [Any?])
+    case 137:
+      return SubtitleTrackMessage.fromList(self.readValue() as! [Any?])
+    case 138:
+      return SelectSubtitleTrackRequest.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -324,6 +380,12 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
       super.writeValue(value.toList())
     } else if let value = value as? DecoderInfoMessage {
       super.writeByte(136)
+      super.writeValue(value.toList())
+    } else if let value = value as? SubtitleTrackMessage {
+      super.writeByte(137)
+      super.writeValue(value.toList())
+    } else if let value = value as? SelectSubtitleTrackRequest {
+      super.writeByte(138)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -368,6 +430,8 @@ protocol AvPlayerHostApi {
   func setWakelock(enabled: Bool, completion: @escaping (Result<Void, Error>) -> Void)
   func setAbrConfig(request: SetAbrConfigRequest, completion: @escaping (Result<Void, Error>) -> Void)
   func getDecoderInfo(playerId: Int64, completion: @escaping (Result<DecoderInfoMessage, Error>) -> Void)
+  func getSubtitleTracks(playerId: Int64, completion: @escaping (Result<[SubtitleTrackMessage], Error>) -> Void)
+  func selectSubtitleTrack(request: SelectSubtitleTrackRequest, completion: @escaping (Result<Void, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -714,6 +778,40 @@ class AvPlayerHostApiSetup {
       }
     } else {
       getDecoderInfoChannel.setMessageHandler(nil)
+    }
+    let getSubtitleTracksChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.av_player.AvPlayerHostApi.getSubtitleTracks\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getSubtitleTracksChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let playerIdArg = args[0] as! Int64
+        api.getSubtitleTracks(playerId: playerIdArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      getSubtitleTracksChannel.setMessageHandler(nil)
+    }
+    let selectSubtitleTrackChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.av_player.AvPlayerHostApi.selectSubtitleTrack\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      selectSubtitleTrackChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! SelectSubtitleTrackRequest
+        api.selectSubtitleTrack(request: requestArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      selectSubtitleTrackChannel.setMessageHandler(nil)
     }
   }
 }

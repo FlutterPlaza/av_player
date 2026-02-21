@@ -35,6 +35,9 @@ class AVPlayerThemeData {
     this.popupMenuColor,
     this.progressBarColor = Colors.white,
     this.progressBarBackgroundColor = const Color(0x3DFFFFFF),
+    this.subtitleTextColor = Colors.white,
+    this.subtitleBackgroundColor = const Color(0xAA000000),
+    this.subtitleFontSize = 16.0,
   });
 
   /// Background color of the controls overlay.
@@ -85,6 +88,18 @@ class AVPlayerThemeData {
   /// Defaults to `Colors.white24`.
   final Color progressBarBackgroundColor;
 
+  /// Subtitle text color.
+  /// Defaults to `Colors.white`.
+  final Color subtitleTextColor;
+
+  /// Subtitle background color.
+  /// Defaults to `Color(0xAA000000)` (semi-transparent black).
+  final Color subtitleBackgroundColor;
+
+  /// Subtitle font size.
+  /// Defaults to `16.0`.
+  final double subtitleFontSize;
+
   /// Creates a copy of this theme data with the given fields replaced.
   AVPlayerThemeData copyWith({
     Color? overlayColor,
@@ -99,6 +114,9 @@ class AVPlayerThemeData {
     Color? popupMenuColor,
     Color? progressBarColor,
     Color? progressBarBackgroundColor,
+    Color? subtitleTextColor,
+    Color? subtitleBackgroundColor,
+    double? subtitleFontSize,
   }) {
     return AVPlayerThemeData(
       overlayColor: overlayColor ?? this.overlayColor,
@@ -115,6 +133,10 @@ class AVPlayerThemeData {
       progressBarColor: progressBarColor ?? this.progressBarColor,
       progressBarBackgroundColor:
           progressBarBackgroundColor ?? this.progressBarBackgroundColor,
+      subtitleTextColor: subtitleTextColor ?? this.subtitleTextColor,
+      subtitleBackgroundColor:
+          subtitleBackgroundColor ?? this.subtitleBackgroundColor,
+      subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
     );
   }
 
@@ -133,7 +155,10 @@ class AVPlayerThemeData {
         other.indicatorBackgroundColor == indicatorBackgroundColor &&
         other.popupMenuColor == popupMenuColor &&
         other.progressBarColor == progressBarColor &&
-        other.progressBarBackgroundColor == progressBarBackgroundColor;
+        other.progressBarBackgroundColor == progressBarBackgroundColor &&
+        other.subtitleTextColor == subtitleTextColor &&
+        other.subtitleBackgroundColor == subtitleBackgroundColor &&
+        other.subtitleFontSize == subtitleFontSize;
   }
 
   @override
@@ -150,6 +175,9 @@ class AVPlayerThemeData {
         popupMenuColor,
         progressBarColor,
         progressBarBackgroundColor,
+        subtitleTextColor,
+        subtitleBackgroundColor,
+        subtitleFontSize,
       );
 }
 

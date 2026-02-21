@@ -6,6 +6,7 @@ import 'screens/music_player_screen.dart';
 import 'screens/pip_screen.dart';
 import 'screens/playlist_screen.dart';
 import 'screens/shorts_screen.dart';
+import 'screens/subtitles_screen.dart';
 import 'screens/theming_screen.dart';
 import 'screens/video_player_screen.dart';
 
@@ -68,6 +69,12 @@ class HomeScreen extends StatelessWidget {
       title: 'Playlist',
       subtitle: 'AVPlaylistController — queue, repeat, shuffle',
       builder: PlaylistScreen.new,
+    ),
+    (
+      icon: Icons.closed_caption,
+      title: 'Subtitles & Captions',
+      subtitle: 'SRT, WebVTT, embedded tracks, CC button',
+      builder: SubtitlesScreen.new,
     ),
     (
       icon: Icons.gesture,

@@ -1,8 +1,8 @@
 # AV Player — Roadmap & Development Plan
 
-**Version:** 0.4.0
-**Last Updated:** 2026-02-20
-**Status:** Published on pub.dev — Android, iOS, macOS, Web, Linux, Windows fully implemented. Integration & widget tests complete. Pigeon migration complete. Performance features (ABR, decoder info, memory pressure) complete.
+**Version:** 0.5.0
+**Last Updated:** 2026-02-21
+**Status:** Published on pub.dev — Android, iOS, macOS, Web, Linux, Windows fully implemented. Integration & widget tests complete. Pigeon migration complete. Performance features (ABR, decoder info, memory pressure) complete. Subtitle/caption support (SRT, WebVTT, embedded tracks) complete.
 
 ---
 
@@ -42,7 +42,8 @@
 | Windows native           | Done    | Media Foundation + D3D11 + WASAPI + SMTC |
 | CI/CD                    | Done    | GitHub Actions (analyze + test + codecov) |
 | Performance features     | Done    | ABR config, decoder info, memory pressure |
-| Dart-side tests          | Done    | 334 tests across 14 files, all passing |
+| Subtitle/caption support | Done    | SRT/WebVTT parser, overlay, CC button, embedded track support |
+| Dart-side tests          | Done    | 386 tests across 16 files, all passing |
 | Integration tests        | Done    | 13 on-device tests (network, asset, file, PIP, playlist, etc.) |
 | Widget interaction tests | Done    | AVControls (45), AVGestures (24), AVPipOverlay (15), AVVideoPlayer (14) |
 | SPM support              | Done    | iOS and macOS (CocoaPods + SPM)  |
@@ -242,7 +243,7 @@ These are potential enhancements beyond the current roadmap:
 
 ### Features
 
-- [ ] Subtitle/caption support (WebVTT, SRT)
+- [x] Subtitle/caption support (WebVTT, SRT)
 - [ ] Audio track selection (multi-audio streams)
 - [ ] DRM support (Widevine/FairPlay) — requires significant native work
 - [ ] Cast/AirPlay integration
@@ -312,7 +313,7 @@ Phase 12 (Pigeon migration)  ← DONE
 | 0.4.0   | Full Windows native implementation with SMTC                              | 2026-02-16 |
 | 0.4.0   | Pigeon migration + performance features (ABR, decoder info, memory pressure) | 2026-02-20 |
 
-**Total tests:** 334 across 14 test files + 13 integration tests, all passing.
+**Total tests:** 386 across 16 test files + 13 integration tests, all passing.
 
 ---
 
@@ -322,20 +323,22 @@ Phase 12 (Pigeon migration)  ← DONE
 
 | File                                              | Tests | What's Covered                                              |
 |---------------------------------------------------|-------|-------------------------------------------------------------|
-| `test/platform/types_test.dart`                   | 38    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums, ABR, decoder info |
-| `test/platform/av_player_platform_interface_test.dart` | 22 | Default instance, 20 UnimplementedError verifications       |
+| `test/platform/types_test.dart`                   | 45    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums, ABR, decoder info, subtitles |
+| `test/platform/av_player_platform_interface_test.dart` | 24 | Default instance, 22 UnimplementedError verifications       |
 | `test/platform/method_channel_av_player_test.dart` | —    | MockAvPlayerHostApi helper (shared by platform tests)       |
-| `test/av_player_test.dart`                        | 43    | State, controller, playlist, theme, presets                 |
-| `test/platform/av_player_ios_test.dart`           | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
-| `test/platform/av_player_android_test.dart`       | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
-| `test/platform/av_player_macos_test.dart`         | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
-| `test/platform/av_player_linux_test.dart`         | 22    | Registration, all Pigeon methods, PIP no-ops, performance   |
-| `test/platform/av_player_web_test.dart`           | 32    | Registration, all methods (pure Dart/JS, no Pigeon)         |
-| `test/platform/av_player_windows_test.dart`       | 22    | Registration, all Pigeon methods, PIP no-ops, performance   |
-| `test/av_controls_test.dart`                      | 45    | Play/pause, skip, slider, speed, PIP, auto-hide, themes    |
+| `test/av_player_test.dart`                        | 49    | State, controller, playlist, theme, presets, subtitles      |
+| `test/platform/av_player_ios_test.dart`           | 25    | Registration, all 22 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_android_test.dart`       | 25    | Registration, all 22 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_macos_test.dart`         | 25    | Registration, all 22 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_linux_test.dart`         | 24    | Registration, all Pigeon methods, PIP no-ops, subtitles     |
+| `test/platform/av_player_web_test.dart`           | 34    | Registration, all methods (pure Dart/JS, no Pigeon)         |
+| `test/platform/av_player_windows_test.dart`       | 24    | Registration, all Pigeon methods, PIP no-ops, subtitles     |
+| `test/av_controls_test.dart`                      | 49    | Play/pause, skip, slider, speed, PIP, CC button, themes    |
 | `test/av_gestures_test.dart`                      | 24    | Double-tap, swipe volume/brightness, long-press, themes     |
 | `test/av_pip_overlay_test.dart`                   | 15    | Drag, snap to corner, mini controls, themes                 |
 | `test/av_video_player_test.dart`                  | 14    | Layer composition, presets, lifecycle, controlsBuilder       |
+| `test/subtitle_parser_test.dart`                  | 12    | SRT parsing, WebVTT parsing, auto-detect, edge cases        |
+| `test/av_subtitle_overlay_test.dart`              | 5     | Null cue, active cue, theme colors, padding, multi-line     |
 | `example/integration_test/player_test.dart`       | 13    | On-device: network/asset/file, PIP, playlist, volume, etc.  |
 | `example/integration_test/app_test.dart`          | 38    | UI navigation across all example screens                    |
 
@@ -346,5 +349,5 @@ Phase 12 (Pigeon migration)  ← DONE
 
 ---
 
-*Roadmap v6 — 2026-02-20*
+*Roadmap v7 — 2026-02-21*
 *Maintained by FlutterPlaza*

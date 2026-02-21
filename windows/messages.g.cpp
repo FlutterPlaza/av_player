@@ -557,6 +557,124 @@ DecoderInfoMessage DecoderInfoMessage::FromEncodableList(const EncodableList& li
   return decoded;
 }
 
+// SubtitleTrackMessage
+
+SubtitleTrackMessage::SubtitleTrackMessage(
+  const std::string& id,
+  const std::string& label)
+ : id_(id),
+    label_(label) {}
+
+SubtitleTrackMessage::SubtitleTrackMessage(
+  const std::string& id,
+  const std::string& label,
+  const std::string* language)
+ : id_(id),
+    label_(label),
+    language_(language ? std::optional<std::string>(*language) : std::nullopt) {}
+
+const std::string& SubtitleTrackMessage::id() const {
+  return id_;
+}
+
+void SubtitleTrackMessage::set_id(std::string_view value_arg) {
+  id_ = value_arg;
+}
+
+
+const std::string& SubtitleTrackMessage::label() const {
+  return label_;
+}
+
+void SubtitleTrackMessage::set_label(std::string_view value_arg) {
+  label_ = value_arg;
+}
+
+
+const std::string* SubtitleTrackMessage::language() const {
+  return language_ ? &(*language_) : nullptr;
+}
+
+void SubtitleTrackMessage::set_language(const std::string_view* value_arg) {
+  language_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void SubtitleTrackMessage::set_language(std::string_view value_arg) {
+  language_ = value_arg;
+}
+
+
+EncodableList SubtitleTrackMessage::ToEncodableList() const {
+  EncodableList list;
+  list.reserve(3);
+  list.push_back(EncodableValue(id_));
+  list.push_back(EncodableValue(label_));
+  list.push_back(language_ ? EncodableValue(*language_) : EncodableValue());
+  return list;
+}
+
+SubtitleTrackMessage SubtitleTrackMessage::FromEncodableList(const EncodableList& list) {
+  SubtitleTrackMessage decoded(
+    std::get<std::string>(list[0]),
+    std::get<std::string>(list[1]));
+  auto& encodable_language = list[2];
+  if (!encodable_language.IsNull()) {
+    decoded.set_language(std::get<std::string>(encodable_language));
+  }
+  return decoded;
+}
+
+// SelectSubtitleTrackRequest
+
+SelectSubtitleTrackRequest::SelectSubtitleTrackRequest(int64_t player_id)
+ : player_id_(player_id) {}
+
+SelectSubtitleTrackRequest::SelectSubtitleTrackRequest(
+  int64_t player_id,
+  const std::string* track_id)
+ : player_id_(player_id),
+    track_id_(track_id ? std::optional<std::string>(*track_id) : std::nullopt) {}
+
+int64_t SelectSubtitleTrackRequest::player_id() const {
+  return player_id_;
+}
+
+void SelectSubtitleTrackRequest::set_player_id(int64_t value_arg) {
+  player_id_ = value_arg;
+}
+
+
+const std::string* SelectSubtitleTrackRequest::track_id() const {
+  return track_id_ ? &(*track_id_) : nullptr;
+}
+
+void SelectSubtitleTrackRequest::set_track_id(const std::string_view* value_arg) {
+  track_id_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void SelectSubtitleTrackRequest::set_track_id(std::string_view value_arg) {
+  track_id_ = value_arg;
+}
+
+
+EncodableList SelectSubtitleTrackRequest::ToEncodableList() const {
+  EncodableList list;
+  list.reserve(2);
+  list.push_back(EncodableValue(player_id_));
+  list.push_back(track_id_ ? EncodableValue(*track_id_) : EncodableValue());
+  return list;
+}
+
+SelectSubtitleTrackRequest SelectSubtitleTrackRequest::FromEncodableList(const EncodableList& list) {
+  SelectSubtitleTrackRequest decoded(
+    std::get<int64_t>(list[0]));
+  auto& encodable_track_id = list[1];
+  if (!encodable_track_id.IsNull()) {
+    decoded.set_track_id(std::get<std::string>(encodable_track_id));
+  }
+  return decoded;
+}
+
 
 PigeonInternalCodecSerializer::PigeonInternalCodecSerializer() {}
 
@@ -589,6 +707,12 @@ EncodableValue PigeonInternalCodecSerializer::ReadValueOfType(
       }
     case 136: {
         return CustomEncodableValue(DecoderInfoMessage::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
+      }
+    case 137: {
+        return CustomEncodableValue(SubtitleTrackMessage::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
+      }
+    case 138: {
+        return CustomEncodableValue(SelectSubtitleTrackRequest::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
       }
     default:
       return flutter::StandardCodecSerializer::ReadValueOfType(type, stream);
@@ -637,6 +761,16 @@ void PigeonInternalCodecSerializer::WriteValue(
     if (custom_value->type() == typeid(DecoderInfoMessage)) {
       stream->WriteByte(136);
       WriteValue(EncodableValue(std::any_cast<DecoderInfoMessage>(*custom_value).ToEncodableList()), stream);
+      return;
+    }
+    if (custom_value->type() == typeid(SubtitleTrackMessage)) {
+      stream->WriteByte(137);
+      WriteValue(EncodableValue(std::any_cast<SubtitleTrackMessage>(*custom_value).ToEncodableList()), stream);
+      return;
+    }
+    if (custom_value->type() == typeid(SelectSubtitleTrackRequest)) {
+      stream->WriteByte(138);
+      WriteValue(EncodableValue(std::any_cast<SelectSubtitleTrackRequest>(*custom_value).ToEncodableList()), stream);
       return;
     }
   }
@@ -1239,6 +1373,64 @@ void AvPlayerHostApi::SetUp(
             }
             EncodableList wrapped;
             wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
+        } catch (const std::exception& exception) {
+          reply(WrapError(exception.what()));
+        }
+      });
+    } else {
+      channel.SetMessageHandler(nullptr);
+    }
+  }
+  {
+    BasicMessageChannel<> channel(binary_messenger, "dev.flutter.pigeon.av_player.AvPlayerHostApi.getSubtitleTracks" + prepended_suffix, &GetCodec());
+    if (api != nullptr) {
+      channel.SetMessageHandler([api](const EncodableValue& message, const flutter::MessageReply<EncodableValue>& reply) {
+        try {
+          const auto& args = std::get<EncodableList>(message);
+          const auto& encodable_player_id_arg = args.at(0);
+          if (encodable_player_id_arg.IsNull()) {
+            reply(WrapError("player_id_arg unexpectedly null."));
+            return;
+          }
+          const int64_t player_id_arg = encodable_player_id_arg.LongValue();
+          api->GetSubtitleTracks(player_id_arg, [reply](ErrorOr<EncodableList>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
+        } catch (const std::exception& exception) {
+          reply(WrapError(exception.what()));
+        }
+      });
+    } else {
+      channel.SetMessageHandler(nullptr);
+    }
+  }
+  {
+    BasicMessageChannel<> channel(binary_messenger, "dev.flutter.pigeon.av_player.AvPlayerHostApi.selectSubtitleTrack" + prepended_suffix, &GetCodec());
+    if (api != nullptr) {
+      channel.SetMessageHandler([api](const EncodableValue& message, const flutter::MessageReply<EncodableValue>& reply) {
+        try {
+          const auto& args = std::get<EncodableList>(message);
+          const auto& encodable_request_arg = args.at(0);
+          if (encodable_request_arg.IsNull()) {
+            reply(WrapError("request_arg unexpectedly null."));
+            return;
+          }
+          const auto& request_arg = std::any_cast<const SelectSubtitleTrackRequest&>(std::get<CustomEncodableValue>(encodable_request_arg));
+          api->SelectSubtitleTrack(request_arg, [reply](std::optional<FlutterError>&& output) {
+            if (output.has_value()) {
+              reply(WrapError(output.value()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue());
             reply(EncodableValue(std::move(wrapped)));
           });
         } catch (const std::exception& exception) {

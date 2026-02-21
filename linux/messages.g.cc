@@ -606,6 +606,142 @@ static AvPlayerDecoderInfoMessage* av_player_decoder_info_message_new_from_list(
   return av_player_decoder_info_message_new(is_hardware_accelerated, decoder_name, codec);
 }
 
+struct _AvPlayerSubtitleTrackMessage {
+  GObject parent_instance;
+
+  gchar* id;
+  gchar* label;
+  gchar* language;
+};
+
+G_DEFINE_TYPE(AvPlayerSubtitleTrackMessage, av_player_subtitle_track_message, G_TYPE_OBJECT)
+
+static void av_player_subtitle_track_message_dispose(GObject* object) {
+  AvPlayerSubtitleTrackMessage* self = AV_PLAYER_SUBTITLE_TRACK_MESSAGE(object);
+  g_clear_pointer(&self->id, g_free);
+  g_clear_pointer(&self->label, g_free);
+  g_clear_pointer(&self->language, g_free);
+  G_OBJECT_CLASS(av_player_subtitle_track_message_parent_class)->dispose(object);
+}
+
+static void av_player_subtitle_track_message_init(AvPlayerSubtitleTrackMessage* self) {
+}
+
+static void av_player_subtitle_track_message_class_init(AvPlayerSubtitleTrackMessageClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = av_player_subtitle_track_message_dispose;
+}
+
+AvPlayerSubtitleTrackMessage* av_player_subtitle_track_message_new(const gchar* id, const gchar* label, const gchar* language) {
+  AvPlayerSubtitleTrackMessage* self = AV_PLAYER_SUBTITLE_TRACK_MESSAGE(g_object_new(av_player_subtitle_track_message_get_type(), nullptr));
+  self->id = g_strdup(id);
+  self->label = g_strdup(label);
+  if (language != nullptr) {
+    self->language = g_strdup(language);
+  }
+  else {
+    self->language = nullptr;
+  }
+  return self;
+}
+
+const gchar* av_player_subtitle_track_message_get_id(AvPlayerSubtitleTrackMessage* self) {
+  g_return_val_if_fail(AV_PLAYER_IS_SUBTITLE_TRACK_MESSAGE(self), nullptr);
+  return self->id;
+}
+
+const gchar* av_player_subtitle_track_message_get_label(AvPlayerSubtitleTrackMessage* self) {
+  g_return_val_if_fail(AV_PLAYER_IS_SUBTITLE_TRACK_MESSAGE(self), nullptr);
+  return self->label;
+}
+
+const gchar* av_player_subtitle_track_message_get_language(AvPlayerSubtitleTrackMessage* self) {
+  g_return_val_if_fail(AV_PLAYER_IS_SUBTITLE_TRACK_MESSAGE(self), nullptr);
+  return self->language;
+}
+
+static FlValue* av_player_subtitle_track_message_to_list(AvPlayerSubtitleTrackMessage* self) {
+  FlValue* values = fl_value_new_list();
+  fl_value_append_take(values, fl_value_new_string(self->id));
+  fl_value_append_take(values, fl_value_new_string(self->label));
+  fl_value_append_take(values, self->language != nullptr ? fl_value_new_string(self->language) : fl_value_new_null());
+  return values;
+}
+
+static AvPlayerSubtitleTrackMessage* av_player_subtitle_track_message_new_from_list(FlValue* values) {
+  FlValue* value0 = fl_value_get_list_value(values, 0);
+  const gchar* id = fl_value_get_string(value0);
+  FlValue* value1 = fl_value_get_list_value(values, 1);
+  const gchar* label = fl_value_get_string(value1);
+  FlValue* value2 = fl_value_get_list_value(values, 2);
+  const gchar* language = nullptr;
+  if (fl_value_get_type(value2) != FL_VALUE_TYPE_NULL) {
+    language = fl_value_get_string(value2);
+  }
+  return av_player_subtitle_track_message_new(id, label, language);
+}
+
+struct _AvPlayerSelectSubtitleTrackRequest {
+  GObject parent_instance;
+
+  int64_t player_id;
+  gchar* track_id;
+};
+
+G_DEFINE_TYPE(AvPlayerSelectSubtitleTrackRequest, av_player_select_subtitle_track_request, G_TYPE_OBJECT)
+
+static void av_player_select_subtitle_track_request_dispose(GObject* object) {
+  AvPlayerSelectSubtitleTrackRequest* self = AV_PLAYER_SELECT_SUBTITLE_TRACK_REQUEST(object);
+  g_clear_pointer(&self->track_id, g_free);
+  G_OBJECT_CLASS(av_player_select_subtitle_track_request_parent_class)->dispose(object);
+}
+
+static void av_player_select_subtitle_track_request_init(AvPlayerSelectSubtitleTrackRequest* self) {
+}
+
+static void av_player_select_subtitle_track_request_class_init(AvPlayerSelectSubtitleTrackRequestClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = av_player_select_subtitle_track_request_dispose;
+}
+
+AvPlayerSelectSubtitleTrackRequest* av_player_select_subtitle_track_request_new(int64_t player_id, const gchar* track_id) {
+  AvPlayerSelectSubtitleTrackRequest* self = AV_PLAYER_SELECT_SUBTITLE_TRACK_REQUEST(g_object_new(av_player_select_subtitle_track_request_get_type(), nullptr));
+  self->player_id = player_id;
+  if (track_id != nullptr) {
+    self->track_id = g_strdup(track_id);
+  }
+  else {
+    self->track_id = nullptr;
+  }
+  return self;
+}
+
+int64_t av_player_select_subtitle_track_request_get_player_id(AvPlayerSelectSubtitleTrackRequest* self) {
+  g_return_val_if_fail(AV_PLAYER_IS_SELECT_SUBTITLE_TRACK_REQUEST(self), 0);
+  return self->player_id;
+}
+
+const gchar* av_player_select_subtitle_track_request_get_track_id(AvPlayerSelectSubtitleTrackRequest* self) {
+  g_return_val_if_fail(AV_PLAYER_IS_SELECT_SUBTITLE_TRACK_REQUEST(self), nullptr);
+  return self->track_id;
+}
+
+static FlValue* av_player_select_subtitle_track_request_to_list(AvPlayerSelectSubtitleTrackRequest* self) {
+  FlValue* values = fl_value_new_list();
+  fl_value_append_take(values, fl_value_new_int(self->player_id));
+  fl_value_append_take(values, self->track_id != nullptr ? fl_value_new_string(self->track_id) : fl_value_new_null());
+  return values;
+}
+
+static AvPlayerSelectSubtitleTrackRequest* av_player_select_subtitle_track_request_new_from_list(FlValue* values) {
+  FlValue* value0 = fl_value_get_list_value(values, 0);
+  int64_t player_id = fl_value_get_int(value0);
+  FlValue* value1 = fl_value_get_list_value(values, 1);
+  const gchar* track_id = nullptr;
+  if (fl_value_get_type(value1) != FL_VALUE_TYPE_NULL) {
+    track_id = fl_value_get_string(value1);
+  }
+  return av_player_select_subtitle_track_request_new(player_id, track_id);
+}
+
 struct _AvPlayerMessageCodec {
   FlStandardMessageCodec parent_instance;
 
@@ -668,6 +804,20 @@ static gboolean av_player_message_codec_write_av_player_decoder_info_message(FlS
   return fl_standard_message_codec_write_value(codec, buffer, values, error);
 }
 
+static gboolean av_player_message_codec_write_av_player_subtitle_track_message(FlStandardMessageCodec* codec, GByteArray* buffer, AvPlayerSubtitleTrackMessage* value, GError** error) {
+  uint8_t type = 137;
+  g_byte_array_append(buffer, &type, sizeof(uint8_t));
+  g_autoptr(FlValue) values = av_player_subtitle_track_message_to_list(value);
+  return fl_standard_message_codec_write_value(codec, buffer, values, error);
+}
+
+static gboolean av_player_message_codec_write_av_player_select_subtitle_track_request(FlStandardMessageCodec* codec, GByteArray* buffer, AvPlayerSelectSubtitleTrackRequest* value, GError** error) {
+  uint8_t type = 138;
+  g_byte_array_append(buffer, &type, sizeof(uint8_t));
+  g_autoptr(FlValue) values = av_player_select_subtitle_track_request_to_list(value);
+  return fl_standard_message_codec_write_value(codec, buffer, values, error);
+}
+
 static gboolean av_player_message_codec_write_value(FlStandardMessageCodec* codec, GByteArray* buffer, FlValue* value, GError** error) {
   if (fl_value_get_type(value) == FL_VALUE_TYPE_CUSTOM) {
     switch (fl_value_get_custom_type(value)) {
@@ -687,6 +837,10 @@ static gboolean av_player_message_codec_write_value(FlStandardMessageCodec* code
         return av_player_message_codec_write_av_player_set_abr_config_request(codec, buffer, AV_PLAYER_SET_ABR_CONFIG_REQUEST(fl_value_get_custom_value_object(value)), error);
       case 136:
         return av_player_message_codec_write_av_player_decoder_info_message(codec, buffer, AV_PLAYER_DECODER_INFO_MESSAGE(fl_value_get_custom_value_object(value)), error);
+      case 137:
+        return av_player_message_codec_write_av_player_subtitle_track_message(codec, buffer, AV_PLAYER_SUBTITLE_TRACK_MESSAGE(fl_value_get_custom_value_object(value)), error);
+      case 138:
+        return av_player_message_codec_write_av_player_select_subtitle_track_request(codec, buffer, AV_PLAYER_SELECT_SUBTITLE_TRACK_REQUEST(fl_value_get_custom_value_object(value)), error);
     }
   }
 
@@ -802,6 +956,36 @@ static FlValue* av_player_message_codec_read_av_player_decoder_info_message(FlSt
   return fl_value_new_custom_object(136, G_OBJECT(value));
 }
 
+static FlValue* av_player_message_codec_read_av_player_subtitle_track_message(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, GError** error) {
+  g_autoptr(FlValue) values = fl_standard_message_codec_read_value(codec, buffer, offset, error);
+  if (values == nullptr) {
+    return nullptr;
+  }
+
+  g_autoptr(AvPlayerSubtitleTrackMessage) value = av_player_subtitle_track_message_new_from_list(values);
+  if (value == nullptr) {
+    g_set_error(error, FL_MESSAGE_CODEC_ERROR, FL_MESSAGE_CODEC_ERROR_FAILED, "Invalid data received for MessageData");
+    return nullptr;
+  }
+
+  return fl_value_new_custom_object(137, G_OBJECT(value));
+}
+
+static FlValue* av_player_message_codec_read_av_player_select_subtitle_track_request(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, GError** error) {
+  g_autoptr(FlValue) values = fl_standard_message_codec_read_value(codec, buffer, offset, error);
+  if (values == nullptr) {
+    return nullptr;
+  }
+
+  g_autoptr(AvPlayerSelectSubtitleTrackRequest) value = av_player_select_subtitle_track_request_new_from_list(values);
+  if (value == nullptr) {
+    g_set_error(error, FL_MESSAGE_CODEC_ERROR, FL_MESSAGE_CODEC_ERROR_FAILED, "Invalid data received for MessageData");
+    return nullptr;
+  }
+
+  return fl_value_new_custom_object(138, G_OBJECT(value));
+}
+
 static FlValue* av_player_message_codec_read_value_of_type(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, int type, GError** error) {
   switch (type) {
     case 129:
@@ -820,6 +1004,10 @@ static FlValue* av_player_message_codec_read_value_of_type(FlStandardMessageCode
       return av_player_message_codec_read_av_player_set_abr_config_request(codec, buffer, offset, error);
     case 136:
       return av_player_message_codec_read_av_player_decoder_info_message(codec, buffer, offset, error);
+    case 137:
+      return av_player_message_codec_read_av_player_subtitle_track_message(codec, buffer, offset, error);
+    case 138:
+      return av_player_message_codec_read_av_player_select_subtitle_track_request(codec, buffer, offset, error);
     default:
       return FL_STANDARD_MESSAGE_CODEC_CLASS(av_player_message_codec_parent_class)->read_value_of_type(codec, buffer, offset, type, error);
   }
@@ -1648,6 +1836,84 @@ static AvPlayerAvPlayerHostApiGetDecoderInfoResponse* av_player_av_player_host_a
   return self;
 }
 
+G_DECLARE_FINAL_TYPE(AvPlayerAvPlayerHostApiGetSubtitleTracksResponse, av_player_av_player_host_api_get_subtitle_tracks_response, AV_PLAYER, AV_PLAYER_HOST_API_GET_SUBTITLE_TRACKS_RESPONSE, GObject)
+
+struct _AvPlayerAvPlayerHostApiGetSubtitleTracksResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(AvPlayerAvPlayerHostApiGetSubtitleTracksResponse, av_player_av_player_host_api_get_subtitle_tracks_response, G_TYPE_OBJECT)
+
+static void av_player_av_player_host_api_get_subtitle_tracks_response_dispose(GObject* object) {
+  AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_GET_SUBTITLE_TRACKS_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(av_player_av_player_host_api_get_subtitle_tracks_response_parent_class)->dispose(object);
+}
+
+static void av_player_av_player_host_api_get_subtitle_tracks_response_init(AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* self) {
+}
+
+static void av_player_av_player_host_api_get_subtitle_tracks_response_class_init(AvPlayerAvPlayerHostApiGetSubtitleTracksResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = av_player_av_player_host_api_get_subtitle_tracks_response_dispose;
+}
+
+static AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* av_player_av_player_host_api_get_subtitle_tracks_response_new(FlValue* return_value) {
+  AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_GET_SUBTITLE_TRACKS_RESPONSE(g_object_new(av_player_av_player_host_api_get_subtitle_tracks_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_ref(return_value));
+  return self;
+}
+
+static AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* av_player_av_player_host_api_get_subtitle_tracks_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  AvPlayerAvPlayerHostApiGetSubtitleTracksResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_GET_SUBTITLE_TRACKS_RESPONSE(g_object_new(av_player_av_player_host_api_get_subtitle_tracks_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
+G_DECLARE_FINAL_TYPE(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse, av_player_av_player_host_api_select_subtitle_track_response, AV_PLAYER, AV_PLAYER_HOST_API_SELECT_SUBTITLE_TRACK_RESPONSE, GObject)
+
+struct _AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse, av_player_av_player_host_api_select_subtitle_track_response, G_TYPE_OBJECT)
+
+static void av_player_av_player_host_api_select_subtitle_track_response_dispose(GObject* object) {
+  AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_SELECT_SUBTITLE_TRACK_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(av_player_av_player_host_api_select_subtitle_track_response_parent_class)->dispose(object);
+}
+
+static void av_player_av_player_host_api_select_subtitle_track_response_init(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* self) {
+}
+
+static void av_player_av_player_host_api_select_subtitle_track_response_class_init(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = av_player_av_player_host_api_select_subtitle_track_response_dispose;
+}
+
+static AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* av_player_av_player_host_api_select_subtitle_track_response_new() {
+  AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_SELECT_SUBTITLE_TRACK_RESPONSE(g_object_new(av_player_av_player_host_api_select_subtitle_track_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_null());
+  return self;
+}
+
+static AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* av_player_av_player_host_api_select_subtitle_track_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse* self = AV_PLAYER_AV_PLAYER_HOST_API_SELECT_SUBTITLE_TRACK_RESPONSE(g_object_new(av_player_av_player_host_api_select_subtitle_track_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
 struct _AvPlayerAvPlayerHostApi {
   GObject parent_instance;
 
@@ -1946,6 +2212,32 @@ static void av_player_av_player_host_api_get_decoder_info_cb(FlBasicMessageChann
   self->vtable->get_decoder_info(player_id, handle, self->user_data);
 }
 
+static void av_player_av_player_host_api_get_subtitle_tracks_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  AvPlayerAvPlayerHostApi* self = AV_PLAYER_AV_PLAYER_HOST_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->get_subtitle_tracks == nullptr) {
+    return;
+  }
+
+  FlValue* value0 = fl_value_get_list_value(message_, 0);
+  int64_t player_id = fl_value_get_int(value0);
+  g_autoptr(AvPlayerAvPlayerHostApiResponseHandle) handle = av_player_av_player_host_api_response_handle_new(channel, response_handle);
+  self->vtable->get_subtitle_tracks(player_id, handle, self->user_data);
+}
+
+static void av_player_av_player_host_api_select_subtitle_track_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  AvPlayerAvPlayerHostApi* self = AV_PLAYER_AV_PLAYER_HOST_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->select_subtitle_track == nullptr) {
+    return;
+  }
+
+  FlValue* value0 = fl_value_get_list_value(message_, 0);
+  AvPlayerSelectSubtitleTrackRequest* request = AV_PLAYER_SELECT_SUBTITLE_TRACK_REQUEST(fl_value_get_custom_value_object(value0));
+  g_autoptr(AvPlayerAvPlayerHostApiResponseHandle) handle = av_player_av_player_host_api_response_handle_new(channel, response_handle);
+  self->vtable->select_subtitle_track(request, handle, self->user_data);
+}
+
 void av_player_av_player_host_api_set_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix, const AvPlayerAvPlayerHostApiVTable* vtable, gpointer user_data, GDestroyNotify user_data_free_func) {
   g_autofree gchar* dot_suffix = suffix != nullptr ? g_strdup_printf(".%s", suffix) : g_strdup("");
   g_autoptr(AvPlayerAvPlayerHostApi) api_data = av_player_av_player_host_api_new(vtable, user_data, user_data_free_func);
@@ -2011,6 +2303,12 @@ void av_player_av_player_host_api_set_method_handlers(FlBinaryMessenger* messeng
   g_autofree gchar* get_decoder_info_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.getDecoderInfo%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) get_decoder_info_channel = fl_basic_message_channel_new(messenger, get_decoder_info_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(get_decoder_info_channel, av_player_av_player_host_api_get_decoder_info_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* get_subtitle_tracks_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.getSubtitleTracks%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) get_subtitle_tracks_channel = fl_basic_message_channel_new(messenger, get_subtitle_tracks_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(get_subtitle_tracks_channel, av_player_av_player_host_api_get_subtitle_tracks_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* select_subtitle_track_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.selectSubtitleTrack%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) select_subtitle_track_channel = fl_basic_message_channel_new(messenger, select_subtitle_track_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(select_subtitle_track_channel, av_player_av_player_host_api_select_subtitle_track_cb, g_object_ref(api_data), g_object_unref);
 }
 
 void av_player_av_player_host_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix) {
@@ -2077,6 +2375,12 @@ void av_player_av_player_host_api_clear_method_handlers(FlBinaryMessenger* messe
   g_autofree gchar* get_decoder_info_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.getDecoderInfo%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) get_decoder_info_channel = fl_basic_message_channel_new(messenger, get_decoder_info_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(get_decoder_info_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* get_subtitle_tracks_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.getSubtitleTracks%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) get_subtitle_tracks_channel = fl_basic_message_channel_new(messenger, get_subtitle_tracks_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(get_subtitle_tracks_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* select_subtitle_track_channel_name = g_strdup_printf("dev.flutter.pigeon.av_player.AvPlayerHostApi.selectSubtitleTrack%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) select_subtitle_track_channel = fl_basic_message_channel_new(messenger, select_subtitle_track_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(select_subtitle_track_channel, nullptr, nullptr, nullptr);
 }
 
 void av_player_av_player_host_api_respond_create(AvPlayerAvPlayerHostApiResponseHandle* response_handle, int64_t return_value) {
@@ -2396,5 +2700,37 @@ void av_player_av_player_host_api_respond_error_get_decoder_info(AvPlayerAvPlaye
   g_autoptr(GError) error = nullptr;
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "AvPlayerHostApi", "getDecoderInfo", error->message);
+  }
+}
+
+void av_player_av_player_host_api_respond_get_subtitle_tracks(AvPlayerAvPlayerHostApiResponseHandle* response_handle, FlValue* return_value) {
+  g_autoptr(AvPlayerAvPlayerHostApiGetSubtitleTracksResponse) response = av_player_av_player_host_api_get_subtitle_tracks_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "AvPlayerHostApi", "getSubtitleTracks", error->message);
+  }
+}
+
+void av_player_av_player_host_api_respond_error_get_subtitle_tracks(AvPlayerAvPlayerHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(AvPlayerAvPlayerHostApiGetSubtitleTracksResponse) response = av_player_av_player_host_api_get_subtitle_tracks_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "AvPlayerHostApi", "getSubtitleTracks", error->message);
+  }
+}
+
+void av_player_av_player_host_api_respond_select_subtitle_track(AvPlayerAvPlayerHostApiResponseHandle* response_handle) {
+  g_autoptr(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse) response = av_player_av_player_host_api_select_subtitle_track_response_new();
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "AvPlayerHostApi", "selectSubtitleTrack", error->message);
+  }
+}
+
+void av_player_av_player_host_api_respond_error_select_subtitle_track(AvPlayerAvPlayerHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(AvPlayerAvPlayerHostApiSelectSubtitleTrackResponse) response = av_player_av_player_host_api_select_subtitle_track_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "AvPlayerHostApi", "selectSubtitleTrack", error->message);
   }
 }

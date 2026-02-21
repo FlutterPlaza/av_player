@@ -127,6 +127,20 @@ void main() {
       test('playerEvents()', () {
         expect(() => platform.playerEvents(1), throwsUnimplementedError);
       });
+
+      test('getSubtitleTracks()', () {
+        expect(
+          () => platform.getSubtitleTracks(1),
+          throwsUnimplementedError,
+        );
+      });
+
+      test('selectSubtitleTrack()', () {
+        expect(
+          () => platform.selectSubtitleTrack(1, 'track_0'),
+          throwsUnimplementedError,
+        );
+      });
     });
   });
 }

@@ -375,6 +375,93 @@ const gchar* av_player_decoder_info_message_get_decoder_name(AvPlayerDecoderInfo
  */
 const gchar* av_player_decoder_info_message_get_codec(AvPlayerDecoderInfoMessage* object);
 
+/**
+ * AvPlayerSubtitleTrackMessage:
+ *
+ */
+
+G_DECLARE_FINAL_TYPE(AvPlayerSubtitleTrackMessage, av_player_subtitle_track_message, AV_PLAYER, SUBTITLE_TRACK_MESSAGE, GObject)
+
+/**
+ * av_player_subtitle_track_message_new:
+ * id: field in this object.
+ * label: field in this object.
+ * language: field in this object.
+ *
+ * Creates a new #SubtitleTrackMessage object.
+ *
+ * Returns: a new #AvPlayerSubtitleTrackMessage
+ */
+AvPlayerSubtitleTrackMessage* av_player_subtitle_track_message_new(const gchar* id, const gchar* label, const gchar* language);
+
+/**
+ * av_player_subtitle_track_message_get_id
+ * @object: a #AvPlayerSubtitleTrackMessage.
+ *
+ * Gets the value of the id field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* av_player_subtitle_track_message_get_id(AvPlayerSubtitleTrackMessage* object);
+
+/**
+ * av_player_subtitle_track_message_get_label
+ * @object: a #AvPlayerSubtitleTrackMessage.
+ *
+ * Gets the value of the label field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* av_player_subtitle_track_message_get_label(AvPlayerSubtitleTrackMessage* object);
+
+/**
+ * av_player_subtitle_track_message_get_language
+ * @object: a #AvPlayerSubtitleTrackMessage.
+ *
+ * Gets the value of the language field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* av_player_subtitle_track_message_get_language(AvPlayerSubtitleTrackMessage* object);
+
+/**
+ * AvPlayerSelectSubtitleTrackRequest:
+ *
+ */
+
+G_DECLARE_FINAL_TYPE(AvPlayerSelectSubtitleTrackRequest, av_player_select_subtitle_track_request, AV_PLAYER, SELECT_SUBTITLE_TRACK_REQUEST, GObject)
+
+/**
+ * av_player_select_subtitle_track_request_new:
+ * player_id: field in this object.
+ * track_id: field in this object.
+ *
+ * Creates a new #SelectSubtitleTrackRequest object.
+ *
+ * Returns: a new #AvPlayerSelectSubtitleTrackRequest
+ */
+AvPlayerSelectSubtitleTrackRequest* av_player_select_subtitle_track_request_new(int64_t player_id, const gchar* track_id);
+
+/**
+ * av_player_select_subtitle_track_request_get_player_id
+ * @object: a #AvPlayerSelectSubtitleTrackRequest.
+ *
+ * Gets the value of the playerId field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t av_player_select_subtitle_track_request_get_player_id(AvPlayerSelectSubtitleTrackRequest* object);
+
+/**
+ * av_player_select_subtitle_track_request_get_track_id
+ * @object: a #AvPlayerSelectSubtitleTrackRequest.
+ *
+ * Gets the value of the trackId field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* av_player_select_subtitle_track_request_get_track_id(AvPlayerSelectSubtitleTrackRequest* object);
+
 G_DECLARE_FINAL_TYPE(AvPlayerMessageCodec, av_player_message_codec, AV_PLAYER, MESSAGE_CODEC, FlStandardMessageCodec)
 
 G_DECLARE_FINAL_TYPE(AvPlayerAvPlayerHostApi, av_player_av_player_host_api, AV_PLAYER, AV_PLAYER_HOST_API, GObject)
@@ -407,6 +494,8 @@ typedef struct {
   void (*set_wakelock)(gboolean enabled, AvPlayerAvPlayerHostApiResponseHandle* response_handle, gpointer user_data);
   void (*set_abr_config)(AvPlayerSetAbrConfigRequest* request, AvPlayerAvPlayerHostApiResponseHandle* response_handle, gpointer user_data);
   void (*get_decoder_info)(int64_t player_id, AvPlayerAvPlayerHostApiResponseHandle* response_handle, gpointer user_data);
+  void (*get_subtitle_tracks)(int64_t player_id, AvPlayerAvPlayerHostApiResponseHandle* response_handle, gpointer user_data);
+  void (*select_subtitle_track)(AvPlayerSelectSubtitleTrackRequest* request, AvPlayerAvPlayerHostApiResponseHandle* response_handle, gpointer user_data);
 } AvPlayerAvPlayerHostApiVTable;
 
 /**
@@ -816,6 +905,45 @@ void av_player_av_player_host_api_respond_get_decoder_info(AvPlayerAvPlayerHostA
  * Responds with an error to AvPlayerHostApi.getDecoderInfo. 
  */
 void av_player_av_player_host_api_respond_error_get_decoder_info(AvPlayerAvPlayerHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * av_player_av_player_host_api_respond_get_subtitle_tracks:
+ * @response_handle: a #AvPlayerAvPlayerHostApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to AvPlayerHostApi.getSubtitleTracks. 
+ */
+void av_player_av_player_host_api_respond_get_subtitle_tracks(AvPlayerAvPlayerHostApiResponseHandle* response_handle, FlValue* return_value);
+
+/**
+ * av_player_av_player_host_api_respond_error_get_subtitle_tracks:
+ * @response_handle: a #AvPlayerAvPlayerHostApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to AvPlayerHostApi.getSubtitleTracks. 
+ */
+void av_player_av_player_host_api_respond_error_get_subtitle_tracks(AvPlayerAvPlayerHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
+ * av_player_av_player_host_api_respond_select_subtitle_track:
+ * @response_handle: a #AvPlayerAvPlayerHostApiResponseHandle.
+ *
+ * Responds to AvPlayerHostApi.selectSubtitleTrack. 
+ */
+void av_player_av_player_host_api_respond_select_subtitle_track(AvPlayerAvPlayerHostApiResponseHandle* response_handle);
+
+/**
+ * av_player_av_player_host_api_respond_error_select_subtitle_track:
+ * @response_handle: a #AvPlayerAvPlayerHostApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to AvPlayerHostApi.selectSubtitleTrack. 
+ */
+void av_player_av_player_host_api_respond_error_select_subtitle_track(AvPlayerAvPlayerHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
 
 G_END_DECLS
 

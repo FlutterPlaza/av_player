@@ -19,11 +19,15 @@ void main() {
       mock.setHandler('isPipAvailable', (_) => true);
       mock.setHandler('getSystemVolume', (_) => 0.75);
       mock.setHandler('getScreenBrightness', (_) => 0.6);
-      mock.setHandler('getDecoderInfo', (_) => DecoderInfoMessage(
-            isHardwareAccelerated: true,
-            decoderName: 'TestDecoder',
-            codec: 'H.264',
-          ));
+      mock.setHandler(
+          'getDecoderInfo',
+          (_) => DecoderInfoMessage(
+                isHardwareAccelerated: true,
+                decoderName: 'TestDecoder',
+                codec: 'H.264',
+              ));
+      mock.setHandler('getSubtitleTracks', (_) => <SubtitleTrackMessage>[]);
+      mock.setHandler('selectSubtitleTrack', (_) => null);
       mock.install();
     });
 
@@ -185,6 +189,21 @@ void main() {
       expect(info.decoderName, 'TestDecoder');
       expect(info.codec, 'H.264');
       expect(mock.log, ['getDecoderInfo']);
+    });
+
+    // -----------------------------------------------------------------------
+    // Subtitles
+    // -----------------------------------------------------------------------
+
+    test('getSubtitleTracks() returns list', () async {
+      final tracks = await platform.getSubtitleTracks(1);
+      expect(tracks, isEmpty);
+      expect(mock.log, ['getSubtitleTracks']);
+    });
+
+    test('selectSubtitleTrack() sends request', () async {
+      await platform.selectSubtitleTrack(1, 'track_0');
+      expect(mock.log, ['selectSubtitleTrack']);
     });
 
     // -----------------------------------------------------------------------

@@ -226,6 +226,47 @@ class AvPlayerPlugin : FlutterPlugin, AvPlayerHostApi, ActivityAware, ComponentC
                     "code" to error.errorCodeName,
                 ))
             }
+
+            override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
+                if (cueGroup.cues.isNotEmpty()) {
+                    val cue = cueGroup.cues.first()
+                    val text = cue.text?.toString() ?: return
+                    eventSink.success(mapOf(
+                        "type" to "subtitleCue",
+                        "text" to text,
+                        "startTime" to (cueGroup.presentationTimeUs / 1000).coerceAtLeast(0),
+                        "endTime" to (cueGroup.presentationTimeUs / 1000 + 5000).coerceAtLeast(0),
+                    ))
+                } else {
+                    eventSink.success(mapOf<String, Any?>(
+                        "type" to "subtitleCue",
+                        "text" to null,
+                    ))
+                }
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                val subtitleTracks = mutableListOf<Map<String, Any?>>()
+                for (groupIndex in 0 until tracks.groups.size) {
+                    val group = tracks.groups[groupIndex]
+                    if (group.type == androidx.media3.common.C.TRACK_TYPE_TEXT) {
+                        for (trackIndex in 0 until group.length) {
+                            val format = group.getTrackFormat(trackIndex)
+                            subtitleTracks.add(mapOf(
+                                "id" to "embedded_${groupIndex}_$trackIndex",
+                                "label" to (format.label ?: "Track ${subtitleTracks.size + 1}"),
+                                "language" to format.language,
+                            ))
+                        }
+                    }
+                }
+                if (subtitleTracks.isNotEmpty()) {
+                    eventSink.success(mapOf(
+                        "type" to "subtitleTracksChanged",
+                        "tracks" to subtitleTracks,
+                    ))
+                }
+            }
         })
 
         // Start position reporting
@@ -360,6 +401,53 @@ class AvPlayerPlugin : FlutterPlugin, AvPlayerHostApi, ActivityAware, ComponentC
                 params.setMaxVideoSize(maxW, maxH)
             }
             ts.setParameters(params)
+        }
+        callback(Result.success(Unit))
+    }
+
+    override fun getSubtitleTracks(playerId: Long, callback: (Result<List<SubtitleTrackMessage>>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        val tracks = mutableListOf<SubtitleTrackMessage>()
+        val currentTracks = instance.player.currentTracks
+        for (groupIndex in 0 until currentTracks.groups.size) {
+            val group = currentTracks.groups[groupIndex]
+            if (group.type == androidx.media3.common.C.TRACK_TYPE_TEXT) {
+                for (trackIndex in 0 until group.length) {
+                    val format = group.getTrackFormat(trackIndex)
+                    tracks.add(SubtitleTrackMessage(
+                        id = "embedded_${groupIndex}_$trackIndex",
+                        label = format.label ?: "Track ${tracks.size + 1}",
+                        language = format.language,
+                    ))
+                }
+            }
+        }
+        callback(Result.success(tracks))
+    }
+
+    override fun selectSubtitleTrack(request: SelectSubtitleTrackRequest, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(request.playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player ${request.playerId} not found.", null)))
+            return
+        }
+        val ts = instance.trackSelector
+        if (ts != null) {
+            if (request.trackId == null) {
+                // Disable all text tracks
+                val params = ts.buildUponParameters()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+                ts.setParameters(params)
+            } else {
+                // Enable text tracks and let ExoPlayer pick
+                val params = ts.buildUponParameters()
+                    .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+                ts.setParameters(params)
+            }
         }
         callback(Result.success(Unit))
     }

@@ -18,6 +18,7 @@ class AVControlsConfig {
     this.showSpeedButton = true,
     this.showFullscreenButton = true,
     this.showLoopButton = true,
+    this.showSubtitleButton = true,
     this.autoHideDuration = const Duration(seconds: 3),
     this.speeds = const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
   });
@@ -39,6 +40,9 @@ class AVControlsConfig {
 
   /// Whether to show the loop toggle button.
   final bool showLoopButton;
+
+  /// Whether to show the subtitle/closed caption button.
+  final bool showSubtitleButton;
 
   /// How long before the controls auto-hide after interaction.
   final Duration autoHideDuration;
@@ -350,6 +354,16 @@ class _AVControlsState extends State<AVControls>
                       _startHideTimer();
                     },
                   ),
+                if (_config.showSubtitleButton)
+                  _SubtitleButton(
+                    controller: widget.controller,
+                    state: state,
+                    accentColor: theme.accentColor,
+                    secondaryColor: theme.secondaryColor,
+                    iconColor: theme.iconColor,
+                    popupMenuColor: theme.popupMenuColor,
+                    onSelected: () => _startHideTimer(),
+                  ),
                 if (_config.showSpeedButton)
                   _SpeedButton(
                     currentSpeed: state.playbackSpeed,
@@ -541,6 +555,95 @@ class _SpeedButton extends StatelessWidget {
         child: Text(
           '${currentSpeed}x',
           style: TextStyle(color: secondaryColor, fontSize: 13),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Subtitle button
+// ---------------------------------------------------------------------------
+
+class _SubtitleButton extends StatelessWidget {
+  const _SubtitleButton({
+    required this.controller,
+    required this.state,
+    required this.accentColor,
+    required this.secondaryColor,
+    required this.iconColor,
+    required this.onSelected,
+    this.popupMenuColor,
+  });
+
+  final AVPlayerController controller;
+  final AVPlayerState state;
+  final Color accentColor;
+  final Color secondaryColor;
+  final Color iconColor;
+  final Color? popupMenuColor;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final tracks = state.availableSubtitleTracks;
+    final enabled = state.subtitlesEnabled;
+
+    if (tracks.isEmpty) {
+      // Simple toggle icon when no tracks are available
+      return _SmallIconButton(
+        icon: enabled ? Icons.closed_caption : Icons.closed_caption_disabled,
+        color: enabled ? accentColor : secondaryColor,
+        onPressed: () {
+          controller.toggleSubtitles();
+          onSelected();
+        },
+      );
+    }
+
+    // PopupMenuButton with track list when tracks are available
+    return PopupMenuButton<String?>(
+      tooltip: 'Subtitles',
+      onSelected: (trackId) {
+        controller.selectSubtitleTrack(trackId);
+        onSelected();
+      },
+      offset: const Offset(0, -200),
+      color: popupMenuColor ?? Colors.grey[900],
+      itemBuilder: (_) => [
+        PopupMenuItem<String?>(
+          value: null,
+          child: Text(
+            'Off',
+            style: TextStyle(
+              color: !enabled ? accentColor : iconColor,
+              fontWeight: !enabled ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        ...tracks.map(
+          (track) => PopupMenuItem<String?>(
+            value: track.id,
+            child: Text(
+              track.label,
+              style: TextStyle(
+                color: state.activeSubtitleTrackId == track.id
+                    ? accentColor
+                    : iconColor,
+                fontWeight: state.activeSubtitleTrackId == track.id
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Icon(
+          enabled ? Icons.closed_caption : Icons.closed_caption_disabled,
+          size: 22,
+          color: enabled ? accentColor : secondaryColor,
         ),
       ),
     );

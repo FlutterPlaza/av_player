@@ -455,6 +455,30 @@ static void handle_get_decoder_info(int64_t player_id,
 }
 
 // =============================================================================
+// Pigeon host API handler: getSubtitleTracks
+// =============================================================================
+
+static void handle_get_subtitle_tracks(int64_t player_id,
+                                        AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                        gpointer user_data) {
+  // TODO: Implement using GStreamer text pads.
+  // Return empty list for now.
+  g_autoptr(FlValue) empty_list = fl_value_new_list();
+  av_player_av_player_host_api_respond_get_subtitle_tracks(response_handle, empty_list);
+}
+
+// =============================================================================
+// Pigeon host API handler: selectSubtitleTrack
+// =============================================================================
+
+static void handle_select_subtitle_track(AvPlayerSelectSubtitleTrackRequest* request,
+                                          AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                          gpointer user_data) {
+  // TODO: Implement using GStreamer text pads.
+  av_player_av_player_host_api_respond_select_subtitle_track(response_handle);
+}
+
+// =============================================================================
 // Memory pressure polling
 // =============================================================================
 
@@ -519,6 +543,8 @@ static const AvPlayerAvPlayerHostApiVTable kVTable = {
     .set_wakelock = handle_set_wakelock,
     .set_abr_config = handle_set_abr_config,
     .get_decoder_info = handle_get_decoder_info,
+    .get_subtitle_tracks = handle_get_subtitle_tracks,
+    .select_subtitle_track = handle_select_subtitle_track,
 };
 
 // =============================================================================

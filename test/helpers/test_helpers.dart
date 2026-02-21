@@ -99,6 +99,17 @@ class TestMockPlatform extends AvPlayerPlatform {
       AVDecoderInfo.unknown;
 
   @override
+  Future<List<AVSubtitleTrack>> getSubtitleTracks(int playerId) async {
+    log.add('getSubtitleTracks');
+    return [];
+  }
+
+  @override
+  Future<void> selectSubtitleTrack(int playerId, String? trackId) async {
+    log.add('selectSubtitleTrack');
+  }
+
+  @override
   Stream<AVPlayerEvent> playerEvents(int playerId) {
     _eventController = StreamController<AVPlayerEvent>();
     return _eventController!.stream;

@@ -1,4 +1,28 @@
 
+# 0.5.0
+
+## Added
+- Subtitle and caption support (SRT, WebVTT) with pure Dart parser — zero native dependencies for external subtitles
+- Embedded subtitle track detection on Android (ExoPlayer), iOS/macOS (AVFoundation), and Web (HTML5 TextTrack)
+- `AVSubtitleParser` for parsing SRT and WebVTT content with auto-detection
+- `AVSubtitleOverlay` widget rendering subtitles over video with theme-aware styling
+- `addSubtitle()`, `selectSubtitleTrack()`, `toggleSubtitles()` methods on `AVPlayerController`
+- CC button in `AVControls` with track selection popup menu
+- Subtitle theming: `subtitleTextColor`, `subtitleBackgroundColor`, `subtitleFontSize` in `AVPlayerThemeData`
+- `showSubtitles` parameter on `AVVideoPlayer` and all presets
+- `AVSubtitleCue`, `AVSubtitleTrack`, `AVSubtitleFormat` types
+- `AVSubtitleTracksChangedEvent`, `AVSubtitleCueEvent` player events
+- `getSubtitleTracks()`, `selectSubtitleTrack()` in platform interface and all 6 platform implementations
+- New Subtitles & Captions screen in example app with multi-language demo
+- 52 new tests (386 total), all passing
+
+## Changed
+- Pigeon schema updated with `SubtitleTrackMessage` and `SelectSubtitleTrackRequest`
+- `AVPlayerState` now includes `currentSubtitleCue`, `availableSubtitleTracks`, `activeSubtitleTrackId`, `subtitlesEnabled`
+- `AVControlsConfig` now includes `showSubtitleButton` (default: true)
+- README updated with subtitle documentation, platform support table, API reference
+- Example app now has 9 feature screens (added Subtitles & Captions)
+
 # 0.4.0
 
 ## Added

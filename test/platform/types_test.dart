@@ -310,8 +310,50 @@ void main() {
         'level': 'nonexistent',
       });
       expect(event, isA<AVMemoryPressureEvent>());
-      expect((event as AVMemoryPressureEvent).level,
-          AVMemoryPressureLevel.normal);
+      expect(
+          (event as AVMemoryPressureEvent).level, AVMemoryPressureLevel.normal);
+    });
+
+    test('parses subtitleTracksChanged event', () {
+      final event = AVPlayerEvent.fromMap({
+        'type': 'subtitleTracksChanged',
+        'tracks': [
+          {'id': 'sub_0', 'label': 'English', 'language': 'en'},
+          {'id': 'sub_1', 'label': 'French', 'language': 'fr'},
+        ],
+      });
+      expect(event, isA<AVSubtitleTracksChangedEvent>());
+      final e = event as AVSubtitleTracksChangedEvent;
+      expect(e.tracks, hasLength(2));
+      expect(e.tracks[0].id, 'sub_0');
+      expect(e.tracks[0].label, 'English');
+      expect(e.tracks[0].language, 'en');
+      expect(e.tracks[0].isEmbedded, true);
+      expect(e.tracks[1].id, 'sub_1');
+      expect(e.tracks[1].label, 'French');
+    });
+
+    test('parses subtitleCue event with text', () {
+      final event = AVPlayerEvent.fromMap({
+        'type': 'subtitleCue',
+        'text': 'Hello, world!',
+        'startTime': 1000,
+        'endTime': 4000,
+      });
+      expect(event, isA<AVSubtitleCueEvent>());
+      final e = event as AVSubtitleCueEvent;
+      expect(e.cue, isNotNull);
+      expect(e.cue!.text, 'Hello, world!');
+      expect(e.cue!.startTime, const Duration(seconds: 1));
+      expect(e.cue!.endTime, const Duration(seconds: 4));
+    });
+
+    test('parses subtitleCue event with null text (cleared)', () {
+      final event = AVPlayerEvent.fromMap({
+        'type': 'subtitleCue',
+      });
+      expect(event, isA<AVSubtitleCueEvent>());
+      expect((event as AVSubtitleCueEvent).cue, isNull);
     });
 
     test('unknown event type returns error event', () {
@@ -399,6 +441,51 @@ void main() {
       expect(AVDecoderInfo.unknown.isHardwareAccelerated, false);
       expect(AVDecoderInfo.unknown.decoderName, isNull);
       expect(AVDecoderInfo.unknown.codec, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AVSubtitleCue / AVSubtitleTrack
+  // ---------------------------------------------------------------------------
+
+  group('AVSubtitleCue', () {
+    test('stores all fields', () {
+      const cue = AVSubtitleCue(
+        startTime: Duration(seconds: 1),
+        endTime: Duration(seconds: 4),
+        text: 'Hello',
+      );
+      expect(cue.startTime, const Duration(seconds: 1));
+      expect(cue.endTime, const Duration(seconds: 4));
+      expect(cue.text, 'Hello');
+    });
+  });
+
+  group('AVSubtitleTrack', () {
+    test('stores all fields with defaults', () {
+      const track = AVSubtitleTrack(id: 't0', label: 'English');
+      expect(track.id, 't0');
+      expect(track.label, 'English');
+      expect(track.language, isNull);
+      expect(track.isEmbedded, false);
+    });
+
+    test('stores all fields when specified', () {
+      const track = AVSubtitleTrack(
+        id: 't1',
+        label: 'French',
+        language: 'fr',
+        isEmbedded: true,
+      );
+      expect(track.language, 'fr');
+      expect(track.isEmbedded, true);
+    });
+  });
+
+  group('AVSubtitleFormat', () {
+    test('has expected values', () {
+      expect(AVSubtitleFormat.values, contains(AVSubtitleFormat.srt));
+      expect(AVSubtitleFormat.values, contains(AVSubtitleFormat.webvtt));
     });
   });
 

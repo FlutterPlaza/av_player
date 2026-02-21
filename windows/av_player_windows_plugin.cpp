@@ -267,6 +267,14 @@ class AvPlayerWindows : public flutter::Plugin,
       int64_t player_id,
       std::function<void(av_player_windows::ErrorOr<av_player_windows::DecoderInfoMessage> reply)>
           result) override;
+  void GetSubtitleTracks(
+      int64_t player_id,
+      std::function<void(av_player_windows::ErrorOr<flutter::EncodableList> reply)>
+          result) override;
+  void SelectSubtitleTrack(
+      const av_player_windows::SelectSubtitleTrackRequest& request,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
 
  private:
   // Build a URI from the VideoSourceMessage.
@@ -666,6 +674,22 @@ void AvPlayerWindows::GetDecoderInfo(
     info.set_decoder_name("D3D11");
   }
   result(info);
+}
+
+void AvPlayerWindows::GetSubtitleTracks(
+    int64_t player_id,
+    std::function<void(av_player_windows::ErrorOr<flutter::EncodableList> reply)>
+        result) {
+  // TODO: Implement using IMFTimedText when available.
+  result(flutter::EncodableList());
+}
+
+void AvPlayerWindows::SelectSubtitleTrack(
+    const av_player_windows::SelectSubtitleTrackRequest& request,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  // TODO: Implement using IMFTimedText when available.
+  result(std::nullopt);
 }
 
 }  // namespace
