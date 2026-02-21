@@ -25,7 +25,12 @@ export 'src/platform/av_player_platform.dart'
         AVErrorEvent,
         AVMediaCommandEvent,
         AVMediaCommand,
-        AVPlaybackState;
+        AVPlaybackState,
+        AVAbrConfig,
+        AVDecoderInfo,
+        AVMemoryPressureLevel,
+        AVAbrInfoEvent,
+        AVMemoryPressureEvent;
 
 /// View type prefix for the web platform view. Must match the prefix
 /// used in [AvPlayerWeb] to register the `<video>` element.
@@ -52,6 +57,8 @@ class AVPlayerState {
     this.volume = 1.0,
     this.aspectRatio = 16 / 9,
     this.errorDescription,
+    this.currentBitrateKbps,
+    this.memoryPressureLevel,
   });
 
   final Duration position;
@@ -67,6 +74,8 @@ class AVPlayerState {
   final double volume;
   final double aspectRatio;
   final String? errorDescription;
+  final int? currentBitrateKbps;
+  final AVMemoryPressureLevel? memoryPressureLevel;
 
   bool get hasError => errorDescription != null;
 
@@ -84,6 +93,8 @@ class AVPlayerState {
     double? volume,
     double? aspectRatio,
     String? errorDescription,
+    int? currentBitrateKbps,
+    AVMemoryPressureLevel? memoryPressureLevel,
   }) {
     return AVPlayerState(
       position: position ?? this.position,
@@ -99,6 +110,8 @@ class AVPlayerState {
       volume: volume ?? this.volume,
       aspectRatio: aspectRatio ?? this.aspectRatio,
       errorDescription: errorDescription ?? this.errorDescription,
+      currentBitrateKbps: currentBitrateKbps ?? this.currentBitrateKbps,
+      memoryPressureLevel: memoryPressureLevel ?? this.memoryPressureLevel,
     );
   }
 }
@@ -198,7 +211,25 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
         value = value.copyWith(errorDescription: message);
       case AVMediaCommandEvent(:final command, :final seekPosition):
         onMediaCommand?.call(command, seekPosition: seekPosition);
+      case AVAbrInfoEvent(:final currentBitrateBps):
+        value = value.copyWith(
+          currentBitrateKbps: (currentBitrateBps / 1000).round(),
+        );
+      case AVMemoryPressureEvent(:final level):
+        value = value.copyWith(memoryPressureLevel: level);
+        if (level == AVMemoryPressureLevel.critical) {
+          _applyMemoryPressureReduction();
+        }
     }
+  }
+
+  void _applyMemoryPressureReduction() {
+    final id = _playerId;
+    if (id == null) return;
+    _platform.setAbrConfig(
+      id,
+      const AVAbrConfig(maxBitrateBps: 500000),
+    );
   }
 
   /// Starts or resumes playback.
@@ -302,6 +333,20 @@ class AVPlayerController extends ValueNotifier<AVPlayerState> {
 
   /// Enables or disables wakelock (prevents screen from turning off).
   Future<void> setWakelock(bool enabled) => _platform.setWakelock(enabled);
+
+  /// Sets the adaptive bitrate streaming configuration.
+  Future<void> setAbrConfig(AVAbrConfig config) async {
+    final id = _playerId;
+    if (id == null) return;
+    await _platform.setAbrConfig(id, config);
+  }
+
+  /// Returns decoder information for the current player.
+  Future<AVDecoderInfo> getDecoderInfo() async {
+    final id = _playerId;
+    if (id == null) return AVDecoderInfo.unknown;
+    return _platform.getDecoderInfo(id);
+  }
 
   @override
   void dispose() {

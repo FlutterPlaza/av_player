@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'av_player'
-  s.version          = '0.3.0'
+  s.version          = '0.4.0'
   s.summary          = 'macOS implementation of the av_player plugin.'
   s.description      = <<-DESC
   macOS implementation of av_player. Uses AVPlayer for video
@@ -19,4 +19,6 @@ Pod::Spec.new do |s|
   s.swift_version = '5.0'
 
   s.frameworks = 'AVFoundation', 'AVKit', 'AppKit', 'MediaPlayer', 'CoreAudio', 'IOKit'
+
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end

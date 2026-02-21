@@ -30,19 +30,20 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
+import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
 import java.net.URL
 
-class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
-    private lateinit var channel: MethodChannel
+class AvPlayerPlugin : FlutterPlugin, AvPlayerHostApi, ActivityAware, ComponentCallbacks2 {
+    private var binaryMessenger: BinaryMessenger? = null
     private var flutterPluginBinding: FlutterPlugin.FlutterPluginBinding? = null
     private var activity: Activity? = null
 
@@ -92,74 +93,51 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         flutterPluginBinding = binding
-        channel = MethodChannel(binding.binaryMessenger, CHANNEL)
-        channel.setMethodCallHandler(this)
-    }
-
-    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
-        when (call.method) {
-            "create" -> handleCreate(call, result)
-            "dispose" -> handleDispose(call, result)
-            "play" -> handlePlayerAction(call, result) { it.play() }
-            "pause" -> handlePlayerAction(call, result) { it.pause() }
-            "seekTo" -> handleSeekTo(call, result)
-            "setPlaybackSpeed" -> handleSetPlaybackSpeed(call, result)
-            "setLooping" -> handleSetLooping(call, result)
-            "setVolume" -> handleSetVolume(call, result)
-            "isPipAvailable" -> result.success(isPipSupported)
-            "enterPip" -> handleEnterPip(call, result)
-            "exitPip" -> handleExitPip(call, result)
-            "setSystemVolume" -> handleSetSystemVolume(call, result)
-            "getSystemVolume" -> handleGetSystemVolume(result)
-            "setScreenBrightness" -> handleSetScreenBrightness(call, result)
-            "getScreenBrightness" -> handleGetScreenBrightness(result)
-            "setWakelock" -> handleSetWakelock(call, result)
-            "setMediaMetadata" -> handleSetMediaMetadata(call, result)
-            "setNotificationEnabled" -> handleSetNotificationEnabled(call, result)
-            else -> result.notImplemented()
-        }
+        binaryMessenger = binding.binaryMessenger
+        AvPlayerHostApi.setUp(binding.binaryMessenger, this)
+        binding.applicationContext.registerComponentCallbacks(this)
     }
 
     // =========================================================================
     // Lifecycle
     // =========================================================================
 
-    private fun handleCreate(call: MethodCall, result: Result) {
+    override fun create(source: VideoSourceMessage, callback: (Result<Long>) -> Unit) {
         val binding = flutterPluginBinding
         val ctx = activity ?: binding?.applicationContext
         if (binding == null || ctx == null) {
-            result.error("NO_CONTEXT", "No Flutter binding or activity available.", null)
+            callback(Result.failure(FlutterError("NO_CONTEXT", "No Flutter binding or activity available.", null)))
             return
         }
 
-        val type = call.argument<String>("type") ?: "network"
-        val url = call.argument<String>("url")
-        val assetPath = call.argument<String>("assetPath")
-        val filePath = call.argument<String>("filePath")
+        val url = source.url
+        val assetPath = source.assetPath
+        val filePath = source.filePath
 
         // Create texture entry
         val textureEntry = binding.textureRegistry.createSurfaceTexture()
         val textureId = textureEntry.id()
 
         // Build ExoPlayer
-        val player = ExoPlayer.Builder(ctx).build()
+        val trackSelector = DefaultTrackSelector(ctx)
+        val player = ExoPlayer.Builder(ctx).setTrackSelector(trackSelector).build()
         val surface = android.view.Surface(textureEntry.surfaceTexture())
         player.setVideoSurface(surface)
 
         // Build media item based on source type
-        val mediaItem = when (type) {
-            "network" -> {
+        val mediaItem = when (source.type) {
+            SourceType.NETWORK -> {
                 if (url == null) {
-                    result.error("INVALID_SOURCE", "Network source requires 'url'.", null)
+                    callback(Result.failure(FlutterError("INVALID_SOURCE", "Network source requires 'url'.", null)))
                     player.release()
                     textureEntry.release()
                     return
                 }
                 MediaItem.fromUri(url)
             }
-            "asset" -> {
+            SourceType.ASSET -> {
                 if (assetPath == null) {
-                    result.error("INVALID_SOURCE", "Asset source requires 'assetPath'.", null)
+                    callback(Result.failure(FlutterError("INVALID_SOURCE", "Asset source requires 'assetPath'.", null)))
                     player.release()
                     textureEntry.release()
                     return
@@ -167,27 +145,21 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val assetKey = binding.flutterAssets.getAssetFilePathByName(assetPath)
                 MediaItem.fromUri("asset:///$assetKey")
             }
-            "file" -> {
+            SourceType.FILE -> {
                 if (filePath == null) {
-                    result.error("INVALID_SOURCE", "File source requires 'filePath'.", null)
+                    callback(Result.failure(FlutterError("INVALID_SOURCE", "File source requires 'filePath'.", null)))
                     player.release()
                     textureEntry.release()
                     return
                 }
                 MediaItem.fromUri(filePath)
             }
-            else -> {
-                result.error("INVALID_SOURCE", "Unknown source type: $type", null)
-                player.release()
-                textureEntry.release()
-                return
-            }
         }
 
         // Set up event channel for this player
         val eventChannel = EventChannel(
             binding.binaryMessenger,
-            "$CHANNEL/events/$textureId"
+            "$EVENT_CHANNEL_PREFIX/events/$textureId"
         )
         val eventSink = QueuingEventSink()
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
@@ -207,6 +179,7 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             eventSink = eventSink,
         )
         players[textureId] = instance
+        instance.trackSelector = trackSelector
 
         // Set up player listener
         player.addListener(object : Player.Listener {
@@ -262,7 +235,7 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         player.setMediaItem(mediaItem)
         player.prepare()
 
-        result.success(textureId)
+        callback(Result.success(textureId))
     }
 
     private fun startPositionReporting(textureId: Long, instance: PlayerInstance) {
@@ -287,14 +260,9 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         mainHandler.postDelayed(runnable, 200)
     }
 
-    private fun handleDispose(call: MethodCall, result: Result) {
-        val playerId = call.argument<Number>("playerId")?.toLong()
-        if (playerId == null) {
-            result.error("INVALID_ARGS", "playerId is required.", null)
-            return
-        }
+    override fun dispose(playerId: Long, callback: (Result<Unit>) -> Unit) {
         disposePlayer(playerId)
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
     private fun disposePlayer(playerId: Long) {
@@ -315,38 +283,122 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     // Playback
     // =========================================================================
 
-    private fun handlePlayerAction(call: MethodCall, result: Result, action: (ExoPlayer) -> Unit) {
-        val instance = getPlayerInstance(call, result) ?: return
-        action(instance.player)
-        result.success(null)
+    override fun play(playerId: Long, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        instance.player.play()
+        callback(Result.success(Unit))
     }
 
-    private fun handleSeekTo(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val position = call.argument<Number>("position")?.toLong() ?: 0L
-        instance.player.seekTo(position)
-        result.success(null)
+    override fun pause(playerId: Long, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        instance.player.pause()
+        callback(Result.success(Unit))
     }
 
-    private fun handleSetPlaybackSpeed(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val speed = call.argument<Number>("speed")?.toFloat() ?: 1.0f
-        instance.player.playbackParameters = PlaybackParameters(speed)
-        result.success(null)
+    override fun seekTo(playerId: Long, positionMs: Long, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        instance.player.seekTo(positionMs)
+        callback(Result.success(Unit))
     }
 
-    private fun handleSetLooping(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val looping = call.argument<Boolean>("looping") ?: false
+    override fun setPlaybackSpeed(playerId: Long, speed: Double, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        instance.player.playbackParameters = PlaybackParameters(speed.toFloat())
+        callback(Result.success(Unit))
+    }
+
+    override fun setLooping(playerId: Long, looping: Boolean, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
         instance.player.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
-    private fun handleSetVolume(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val volume = call.argument<Number>("volume")?.toFloat() ?: 1.0f
-        instance.player.volume = volume.coerceIn(0.0f, 1.0f)
-        result.success(null)
+    override fun setVolume(playerId: Long, volume: Double, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        instance.player.volume = volume.toFloat().coerceIn(0.0f, 1.0f)
+        callback(Result.success(Unit))
+    }
+
+    override fun setAbrConfig(request: SetAbrConfigRequest, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(request.playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player ${request.playerId} not found.", null)))
+            return
+        }
+        val ts = instance.trackSelector
+        if (ts != null) {
+            val params = ts.buildUponParameters()
+            request.config.maxBitrateBps?.let { params.setMaxVideoBitrate(it.toInt()) }
+            request.config.minBitrateBps?.let { params.setMinVideoBitrate(it.toInt()) }
+            val maxW = request.config.preferredMaxWidth?.toInt() ?: Int.MAX_VALUE
+            val maxH = request.config.preferredMaxHeight?.toInt() ?: Int.MAX_VALUE
+            if (request.config.preferredMaxWidth != null || request.config.preferredMaxHeight != null) {
+                params.setMaxVideoSize(maxW, maxH)
+            }
+            ts.setParameters(params)
+        }
+        callback(Result.success(Unit))
+    }
+
+    override fun getDecoderInfo(playerId: Long, callback: (Result<DecoderInfoMessage>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
+            return
+        }
+        try {
+            val format = instance.player.videoFormat
+            val mimeType = format?.sampleMimeType
+            if (mimeType != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val codecList = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+                val codecInfo = codecList.codecInfos.firstOrNull { info ->
+                    !info.isEncoder && info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
+                }
+                if (codecInfo != null) {
+                    callback(Result.success(DecoderInfoMessage(
+                        isHardwareAccelerated = codecInfo.isHardwareAccelerated,
+                        decoderName = codecInfo.name,
+                        codec = mimeType,
+                    )))
+                    return
+                }
+            }
+            callback(Result.success(DecoderInfoMessage(
+                isHardwareAccelerated = false,
+                decoderName = null,
+                codec = mimeType,
+            )))
+        } catch (e: Exception) {
+            callback(Result.success(DecoderInfoMessage(
+                isHardwareAccelerated = false,
+                decoderName = null,
+                codec = null,
+            )))
+        }
     }
 
     // =========================================================================
@@ -363,18 +415,22 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    private fun handleEnterPip(call: MethodCall, result: Result) {
+    override fun isPipAvailable(callback: (Result<Boolean>) -> Unit) {
+        callback(Result.success(isPipSupported))
+    }
+
+    override fun enterPip(request: EnterPipRequest, callback: (Result<Unit>) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            result.error("UNSUPPORTED", "PIP requires Android 8.0+.", null)
+            callback(Result.failure(FlutterError("UNSUPPORTED", "PIP requires Android 8.0+.", null)))
             return
         }
         val act = activity
         if (act == null) {
-            result.error("NO_ACTIVITY", "Activity not available.", null)
+            callback(Result.failure(FlutterError("NO_ACTIVITY", "Activity not available.", null)))
             return
         }
 
-        val aspectRatioArg = call.argument<Number>("aspectRatio")?.toDouble()
+        val aspectRatioArg = request.aspectRatio
         val rational = if (aspectRatioArg != null && aspectRatioArg > 0) {
             // Convert double aspect ratio to rational (e.g., 1.778 -> 16/9)
             Rational((aspectRatioArg * 1000).toInt(), 1000)
@@ -421,10 +477,10 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 "isInPipMode" to true,
             ))
         }
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
-    private fun handleExitPip(call: MethodCall, result: Result) {
+    override fun exitPip(playerId: Long, callback: (Result<Unit>) -> Unit) {
         // Android doesn't have a programmatic exit PIP, but we can notify state
         players.values.forEach { instance ->
             instance.eventSink.success(mapOf(
@@ -432,58 +488,52 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 "isInPipMode" to false,
             ))
         }
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
     // =========================================================================
     // System controls
     // =========================================================================
 
-    private fun handleSetSystemVolume(call: MethodCall, result: Result) {
-        val volume = call.argument<Number>("volume")?.toDouble() ?: return result.error(
-            "INVALID_ARGS", "volume is required.", null
-        )
+    override fun setSystemVolume(volume: Double, callback: (Result<Unit>) -> Unit) {
         val audioManager = activity?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (audioManager == null) {
-            result.error("NO_SERVICE", "AudioManager not available.", null)
+            callback(Result.failure(FlutterError("NO_SERVICE", "AudioManager not available.", null)))
             return
         }
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val targetVolume = (volume * maxVolume).toInt().coerceIn(0, maxVolume)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
-    private fun handleGetSystemVolume(result: Result) {
+    override fun getSystemVolume(callback: (Result<Double>) -> Unit) {
         val audioManager = activity?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (audioManager == null) {
-            result.error("NO_SERVICE", "AudioManager not available.", null)
+            callback(Result.failure(FlutterError("NO_SERVICE", "AudioManager not available.", null)))
             return
         }
         val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        result.success(if (max > 0) current.toDouble() / max else 0.0)
+        callback(Result.success(if (max > 0) current.toDouble() / max else 0.0))
     }
 
-    private fun handleSetScreenBrightness(call: MethodCall, result: Result) {
-        val brightness = call.argument<Number>("brightness")?.toFloat() ?: return result.error(
-            "INVALID_ARGS", "brightness is required.", null
-        )
+    override fun setScreenBrightness(brightness: Double, callback: (Result<Unit>) -> Unit) {
         val act = activity
         if (act == null) {
-            result.error("NO_ACTIVITY", "Activity not available.", null)
+            callback(Result.failure(FlutterError("NO_ACTIVITY", "Activity not available.", null)))
             return
         }
         val layoutParams = act.window.attributes
-        layoutParams.screenBrightness = brightness.coerceIn(0.0f, 1.0f)
+        layoutParams.screenBrightness = brightness.toFloat().coerceIn(0.0f, 1.0f)
         act.window.attributes = layoutParams
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
-    private fun handleGetScreenBrightness(result: Result) {
+    override fun getScreenBrightness(callback: (Result<Double>) -> Unit) {
         val act = activity
         if (act == null) {
-            result.error("NO_ACTIVITY", "Activity not available.", null)
+            callback(Result.failure(FlutterError("NO_ACTIVITY", "Activity not available.", null)))
             return
         }
         val brightness = act.window.attributes.screenBrightness
@@ -493,22 +543,19 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val systemBrightness = Settings.System.getInt(
                     act.contentResolver, Settings.System.SCREEN_BRIGHTNESS
                 )
-                result.success(systemBrightness.toDouble() / 255.0)
+                callback(Result.success(systemBrightness.toDouble() / 255.0))
             } catch (e: Settings.SettingNotFoundException) {
-                result.success(0.5)
+                callback(Result.success(0.5))
             }
         } else {
-            result.success(brightness.toDouble())
+            callback(Result.success(brightness.toDouble()))
         }
     }
 
-    private fun handleSetWakelock(call: MethodCall, result: Result) {
-        val enabled = call.argument<Boolean>("enabled") ?: return result.error(
-            "INVALID_ARGS", "enabled is required.", null
-        )
+    override fun setWakelock(enabled: Boolean, callback: (Result<Unit>) -> Unit) {
         val act = activity
         if (act == null) {
-            result.error("NO_ACTIVITY", "Activity not available.", null)
+            callback(Result.failure(FlutterError("NO_ACTIVITY", "Activity not available.", null)))
             return
         }
         if (enabled) {
@@ -516,25 +563,25 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         } else {
             act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
     // =========================================================================
     // Media Session & Notification
     // =========================================================================
 
-    private fun handleSetMediaMetadata(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val args = call.arguments as? Map<*, *>
-        if (args == null) {
-            result.error("INVALID_ARGS", "Arguments required.", null)
+    override fun setMediaMetadata(request: MediaMetadataRequest, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(request.playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player ${request.playerId} not found.", null)))
             return
         }
 
-        instance.metadataTitle = args["title"] as? String
-        instance.metadataArtist = args["artist"] as? String
-        instance.metadataAlbum = args["album"] as? String
-        val artworkUrl = args["artworkUrl"] as? String
+        val metadata = request.metadata
+        instance.metadataTitle = metadata.title
+        instance.metadataArtist = metadata.artist
+        instance.metadataAlbum = metadata.album
+        val artworkUrl = metadata.artworkUrl
 
         // Update the media session metadata
         val ctx = activity ?: flutterPluginBinding?.applicationContext
@@ -546,17 +593,15 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
-    private fun handleSetNotificationEnabled(call: MethodCall, result: Result) {
-        val instance = getPlayerInstance(call, result) ?: return
-        val args = call.arguments as? Map<*, *>
-        if (args == null) {
-            result.error("INVALID_ARGS", "Arguments required.", null)
+    override fun setNotificationEnabled(playerId: Long, enabled: Boolean, callback: (Result<Unit>) -> Unit) {
+        val instance = getPlayerInstance(playerId)
+        if (instance == null) {
+            callback(Result.failure(FlutterError("NO_PLAYER", "Player $playerId not found.", null)))
             return
         }
-        val enabled = args["enabled"] as? Boolean ?: false
         instance.notificationEnabled = enabled
 
         val ctx = activity ?: flutterPluginBinding?.applicationContext
@@ -572,7 +617,7 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
-        result.success(null)
+        callback(Result.success(Unit))
     }
 
     private fun ensureMediaSession(instance: PlayerInstance, ctx: Context) {
@@ -812,18 +857,8 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     // Helpers
     // =========================================================================
 
-    private fun getPlayerInstance(call: MethodCall, result: Result): PlayerInstance? {
-        val playerId = call.argument<Number>("playerId")?.toLong()
-        if (playerId == null) {
-            result.error("INVALID_ARGS", "playerId is required.", null)
-            return null
-        }
-        val instance = players[playerId]
-        if (instance == null) {
-            result.error("NO_PLAYER", "Player $playerId not found.", null)
-            return null
-        }
-        return instance
+    private fun getPlayerInstance(playerId: Long): PlayerInstance? {
+        return players[playerId]
     }
 
     private fun createActionPendingIntent(activity: Activity, action: String): PendingIntent {
@@ -882,12 +917,41 @@ class AvPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+        flutterPluginBinding?.applicationContext?.unregisterComponentCallbacks(this)
+        val messenger = binaryMessenger
+        if (messenger != null) {
+            AvPlayerHostApi.setUp(messenger, null)
+        }
+        binaryMessenger = null
         flutterPluginBinding = null
     }
 
+    // =========================================================================
+    // Memory Pressure (ComponentCallbacks2)
+    // =========================================================================
+
+    override fun onTrimMemory(level: Int) {
+        val pressureLevel = when {
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> "critical"
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> "warning"
+            else -> return
+        }
+        players.values.forEach { instance ->
+            instance.eventSink.success(mapOf(
+                "type" to "memoryPressure",
+                "level" to pressureLevel,
+            ))
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {}
+
+    override fun onLowMemory() {
+        onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
+    }
+
     companion object {
-        private const val CHANNEL = "com.flutterplaza.av_player_android"
+        private const val EVENT_CHANNEL_PREFIX = "com.flutterplaza.av_player_android"
 
         private const val ACTION_PLAY = "com.flutterplaza.avpip.ACTION_PLAY"
         private const val ACTION_PAUSE = "com.flutterplaza.avpip.ACTION_PAUSE"
@@ -916,6 +980,7 @@ private class PlayerInstance(
     var metadataAlbum: String? = null
     var artworkUrl: String? = null
     var artworkBitmap: Bitmap? = null
+    var trackSelector: DefaultTrackSelector? = null
 }
 
 // =============================================================================

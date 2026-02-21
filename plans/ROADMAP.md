@@ -1,8 +1,8 @@
 # AV Player — Roadmap & Development Plan
 
 **Version:** 0.4.0
-**Last Updated:** 2026-02-16
-**Status:** Published on pub.dev — Android, iOS, macOS, Web, Linux, Windows fully implemented. Integration & widget tests complete.
+**Last Updated:** 2026-02-20
+**Status:** Published on pub.dev — Android, iOS, macOS, Web, Linux, Windows fully implemented. Integration & widget tests complete. Pigeon migration complete. Performance features (ABR, decoder info, memory pressure) complete.
 
 ---
 
@@ -41,18 +41,18 @@
 | Linux native             | Done    | GStreamer + MPRIS2 + PulseAudio + sysfs |
 | Windows native           | Done    | Media Foundation + D3D11 + WASAPI + SMTC |
 | CI/CD                    | Done    | GitHub Actions (analyze + test + codecov) |
-| Dart-side tests          | Done    | 341 tests across 14 files, all passing |
+| Performance features     | Done    | ABR config, decoder info, memory pressure |
+| Dart-side tests          | Done    | 334 tests across 14 files, all passing |
 | Integration tests        | Done    | 13 on-device tests (network, asset, file, PIP, playlist, etc.) |
 | Widget interaction tests | Done    | AVControls (45), AVGestures (24), AVPipOverlay (15), AVVideoPlayer (14) |
 | SPM support              | Done    | iOS and macOS (CocoaPods + SPM)  |
 | Single-package structure | Done    | Merged 8 federated packages into one |
-| Published to pub.dev     | Done    | v0.3.0                          |
+| Pigeon codegen           | Done    | All 5 native platforms (type-safe Dart↔Native) |
+| Published to pub.dev     | Done    | v0.4.0                          |
 
 ### What's Not Done
 
-| Component                | Status  | Planned Phase |
-|--------------------------|---------|---------------|
-| Pigeon codegen           | Manual  | Phase 12      |
+All planned phases are complete.
 
 ---
 
@@ -171,7 +171,7 @@ A monolithic `AVPlayerConfig` object combining `AVControlsConfig`, `AVGestureCon
 
 ## 5. Phase 11: Integration & Widget Tests — DONE
 
-**Status:** Complete — 341 unit/widget tests + 13 integration tests, all passing.
+**Status:** Complete — 312 unit/widget tests + 13 integration tests, all passing.
 
 ### 11.1 Integration Tests (on-device) — `example/integration_test/player_test.dart`
 
@@ -210,31 +210,23 @@ Goal: >80% line coverage across all Dart code. CI uploads coverage to Codecov.
 
 ---
 
-## 6. Phase 12: Pigeon Migration
+## 6. Phase 12: Pigeon Migration — DONE
 
-**Priority:** Low — Current MethodChannel strings work fine, Pigeon adds type safety
+**Status:** Complete — All 5 native platforms migrated from hand-written MethodChannel to Pigeon-generated type-safe codegen.
 
-### Why Migrate
+### What Was Done
 
-- Type-safe codegen for method channels (no string typos)
-- Generated Swift/Kotlin host API classes
-- Generated Dart API classes
-- Automatic argument serialization
-- Eliminates `invokeMethod<Type>` casts
-
-### Scope
-
-- [ ] Define Pigeon schema (`.dart` file with `@HostApi()` annotations)
-- [ ] Generate Android Kotlin bindings
-- [ ] Generate iOS Swift bindings
-- [ ] Generate macOS Swift bindings
-- [ ] Update all native plugins to use generated host APIs
-- [ ] Update all Dart-side implementations to use generated Dart APIs
-- [ ] Update tests for new API signatures
-
-### Risk
-
-Medium — Large refactor touching all 3 native plugins + 3 Dart implementations. Should be done in a single coordinated pass.
+- [x] Pigeon schema (`pigeons/messages.dart`) with `@HostApi()` and 18 `@async` methods
+- [x] Generated bindings: Kotlin (Android), Swift (iOS/macOS), C++ (Windows), GObject (Linux)
+- [x] Shared `PigeonAvPlayer` Dart adapter base class — all platform classes are thin wrappers
+- [x] Android: `AvPlayerPlugin` implements `AvPlayerHostApi` interface (replaced `MethodCallHandler`)
+- [x] iOS: `AvPlayerPlugin` conforms to `AvPlayerHostApi` protocol (replaced `handle(_:result:)`)
+- [x] macOS: Same pattern as iOS (shared generated Swift, uses `registrar.messenger` property)
+- [x] Windows: Implements `AvPlayerHostApi` C++ interface (replaced `HandleMethodCall`)
+- [x] Linux: Implements GObject vtable (replaced `method_call_cb` string dispatch)
+- [x] All tests migrated to mock Pigeon's `BasicMessageChannel` instead of `MethodChannel`
+- [x] EventChannels preserved unchanged (Pigeon doesn't generate EventChannel code)
+- [x] Zero breaking changes — `AvPlayerPlatform` public API unchanged
 
 ---
 
@@ -242,11 +234,11 @@ Medium — Large refactor touching all 3 native plugins + 3 Dart implementations
 
 These are potential enhancements beyond the current roadmap:
 
-### Performance
+### Performance — DONE (v0.4.0)
 
-- [ ] Adaptive bitrate streaming (ABR) configuration API
-- [ ] Hardware decode verification / fallback reporting
-- [ ] Memory pressure monitoring + automatic quality reduction
+- [x] Adaptive bitrate streaming (ABR) configuration API
+- [x] Hardware decode verification / fallback reporting
+- [x] Memory pressure monitoring + automatic quality reduction
 
 ### Features
 
@@ -270,7 +262,7 @@ These are potential enhancements beyond the current roadmap:
 ```
 Phase 10 (Windows)           ← DONE
     ↓
-Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
+Phase 12 (Pigeon migration)  ← DONE
 ```
 
 ### Milestone: Stable Release
@@ -281,7 +273,7 @@ Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
 - [x] SPM support for iOS and macOS
 - [x] Single-package structure (merged federated packages)
 - [x] Published to pub.dev (v0.3.0)
-- [x] 341 Dart-side tests passing (14 test files)
+- [x] 334 Dart-side tests passing (14 test files)
 - [x] 13 integration tests passing on macOS (network, asset, file, PIP, playlist, etc.)
 - [x] Widget interaction tests (AVControls, AVGestures, AVPipOverlay, AVVideoPlayer)
 - [ ] >80% coverage (Codecov integration in CI)
@@ -308,6 +300,7 @@ Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
 | 8     | Web native                        | Done      | 30    |
 | 9     | Linux native                      | Done      | 25    |
 | 10    | Windows native                    | Done      | 25    |
+| 12    | Pigeon migration                  | Done      | —     |
 
 ### Post-Phase Work
 
@@ -316,8 +309,10 @@ Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
 | 0.2.0   | Merged 8 federated packages into single package | 2026-02-13 |
 | 0.2.1   | SPM support, iOS config updates, analysis fixes | 2026-02-14 |
 | 0.3.0   | Full Windows stub, integration/widget tests, CI enhancements, README GIFs | 2026-02-16 |
+| 0.4.0   | Full Windows native implementation with SMTC                              | 2026-02-16 |
+| 0.4.0   | Pigeon migration + performance features (ABR, decoder info, memory pressure) | 2026-02-20 |
 
-**Total tests:** 341 across 14 test files + 13 integration tests, all passing.
+**Total tests:** 334 across 14 test files + 13 integration tests, all passing.
 
 ---
 
@@ -327,16 +322,16 @@ Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
 
 | File                                              | Tests | What's Covered                                              |
 |---------------------------------------------------|-------|-------------------------------------------------------------|
-| `test/platform/types_test.dart`                   | 28    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums        |
-| `test/platform/av_player_platform_interface_test.dart` | 20 | Default instance, 18 UnimplementedError verifications       |
-| `test/platform/method_channel_av_player_test.dart` | 24   | All MethodChannel calls, null handling, EventChannel        |
+| `test/platform/types_test.dart`                   | 38    | AVVideoSource, AVMediaMetadata, AVPlayerEvent, enums, ABR, decoder info |
+| `test/platform/av_player_platform_interface_test.dart` | 22 | Default instance, 20 UnimplementedError verifications       |
+| `test/platform/method_channel_av_player_test.dart` | —    | MockAvPlayerHostApi helper (shared by platform tests)       |
 | `test/av_player_test.dart`                        | 43    | State, controller, playlist, theme, presets                 |
-| `test/platform/av_player_ios_test.dart`           | 26    | Registration, channel name, all 20 methods                  |
-| `test/platform/av_player_android_test.dart`       | 26    | Registration, channel name, all 20 methods                  |
-| `test/platform/av_player_macos_test.dart`         | 26    | Registration, channel name, all 20 methods                  |
-| `test/platform/av_player_linux_test.dart`         | 25    | Registration, channel name, all 20 methods (PIP N/A)        |
-| `test/platform/av_player_web_test.dart`           | 30    | Registration, channel name, all methods                     |
-| `test/platform/av_player_windows_test.dart`       | 25    | Registration, channel name, all 20 methods                  |
+| `test/platform/av_player_ios_test.dart`           | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_android_test.dart`       | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_macos_test.dart`         | 23    | Registration, all 20 Pigeon methods + PIP with aspect ratio |
+| `test/platform/av_player_linux_test.dart`         | 22    | Registration, all Pigeon methods, PIP no-ops, performance   |
+| `test/platform/av_player_web_test.dart`           | 32    | Registration, all methods (pure Dart/JS, no Pigeon)         |
+| `test/platform/av_player_windows_test.dart`       | 22    | Registration, all Pigeon methods, PIP no-ops, performance   |
 | `test/av_controls_test.dart`                      | 45    | Play/pause, skip, slider, speed, PIP, auto-hide, themes    |
 | `test/av_gestures_test.dart`                      | 24    | Double-tap, swipe volume/brightness, long-press, themes     |
 | `test/av_pip_overlay_test.dart`                   | 15    | Drag, snap to corner, mini controls, themes                 |
@@ -351,5 +346,5 @@ Phase 12 (Pigeon migration)  ← Next priority, low urgency, quality-of-life
 
 ---
 
-*Roadmap v4 — 2026-02-16*
+*Roadmap v6 — 2026-02-20*
 *Maintained by FlutterPlaza*

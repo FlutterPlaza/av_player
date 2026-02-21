@@ -3,124 +3,85 @@ import UIKit
 import AVFoundation
 import AVKit
 import MediaPlayer
+import VideoToolbox
 
 // =============================================================================
 // MARK: - Plugin
 // =============================================================================
 
-public class AvPlayerPlugin: NSObject, FlutterPlugin {
+@objc(AvPlayerPlugin)
+public class AvPlayerPlugin: NSObject, FlutterPlugin, AvPlayerHostApi {
     private let registrar: FlutterPluginRegistrar
-    private let channel: FlutterMethodChannel
     private var players: [Int64: PlayerInstance] = [:]
 
     static let channelName = "com.flutterplaza.av_player_ios"
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
-        self.channel = FlutterMethodChannel(
-            name: Self.channelName,
-            binaryMessenger: registrar.messenger()
-        )
         super.init()
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = AvPlayerPlugin(registrar: registrar)
-        registrar.addMethodCallDelegate(instance, channel: instance.channel)
+        AvPlayerHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: instance)
     }
 
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        switch call.method {
-        case "create":
-            handleCreate(call, result: result)
-        case "dispose":
-            handleDispose(call, result: result)
-        case "play":
-            withPlayer(call, result: result) { instance in
-                instance.player.play()
-                if instance.playbackSpeed != 1.0 {
-                    instance.player.rate = instance.playbackSpeed
-                }
-            }
-        case "pause":
-            withPlayer(call, result: result) { $0.player.pause() }
-        case "seekTo":
-            handleSeekTo(call, result: result)
-        case "setPlaybackSpeed":
-            handleSetPlaybackSpeed(call, result: result)
-        case "setLooping":
-            handleSetLooping(call, result: result)
-        case "setVolume":
-            handleSetVolume(call, result: result)
-        case "isPipAvailable":
-            result(AVPictureInPictureController.isPictureInPictureSupported())
-        case "enterPip":
-            handleEnterPip(call, result: result)
-        case "exitPip":
-            handleExitPip(call, result: result)
-        case "setSystemVolume":
-            result(FlutterError(
-                code: "UNSUPPORTED",
-                message: "iOS does not support programmatic system volume changes.",
-                details: nil
-            ))
-        case "getSystemVolume":
-            result(Double(AVAudioSession.sharedInstance().outputVolume))
-        case "setScreenBrightness":
-            handleSetScreenBrightness(call, result: result)
-        case "getScreenBrightness":
-            result(Double(UIScreen.main.brightness))
-        case "setWakelock":
-            handleSetWakelock(call, result: result)
-        case "setMediaMetadata":
-            handleSetMediaMetadata(call, result: result)
-        case "setNotificationEnabled":
-            handleSetNotificationEnabled(call, result: result)
-        default:
-            result(FlutterMethodNotImplemented)
+    // =========================================================================
+    // MARK: - Helpers
+    // =========================================================================
+
+    private func getPlayer(_ playerId: Int64) -> Result<PlayerInstance, PigeonError> {
+        guard let instance = players[playerId] else {
+            return .failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil))
+        }
+        return .success(instance)
+    }
+
+    private static var keyWindowRootView: UIView? {
+        if #available(iOS 15.0, *) {
+            return UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })?
+                .rootViewController?.view
+        } else {
+            return UIApplication.shared.windows
+                .first(where: { $0.isKeyWindow })?
+                .rootViewController?.view
         }
     }
 
     // =========================================================================
-    // MARK: - Lifecycle
+    // MARK: - AvPlayerHostApi: Lifecycle
     // =========================================================================
 
-    private func handleCreate(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Arguments required.", details: nil))
-            return
-        }
-
-        let type = args["type"] as? String ?? "network"
+    func create(source: VideoSourceMessage, completion: @escaping (Result<Int64, Error>) -> Void) {
         let videoURL: URL
 
-        switch type {
-        case "network":
-            guard let urlString = args["url"] as? String, let url = URL(string: urlString) else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Network source requires a valid 'url'.", details: nil))
+        switch source.type {
+        case .network:
+            guard let urlString = source.url, let url = URL(string: urlString) else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Network source requires a valid 'url'.", details: nil)))
                 return
             }
             videoURL = url
-        case "asset":
-            guard let assetPath = args["assetPath"] as? String else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Asset source requires 'assetPath'.", details: nil))
+        case .asset:
+            guard let assetPath = source.assetPath else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Asset source requires 'assetPath'.", details: nil)))
                 return
             }
             let key = registrar.lookupKey(forAsset: assetPath)
             guard let path = Bundle.main.path(forResource: key, ofType: nil) else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Asset not found: \(assetPath)", details: nil))
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Asset not found: \(assetPath)", details: nil)))
                 return
             }
             videoURL = URL(fileURLWithPath: path)
-        case "file":
-            guard let filePath = args["filePath"] as? String else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "File source requires 'filePath'.", details: nil))
+        case .file:
+            guard let filePath = source.filePath else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "File source requires 'filePath'.", details: nil)))
                 return
             }
             videoURL = URL(fileURLWithPath: filePath)
-        default:
-            result(FlutterError(code: "INVALID_SOURCE", message: "Unknown source type: \(type)", details: nil))
-            return
         }
 
         // Configure audio session for video playback
@@ -191,13 +152,12 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
         instance.startDisplayLink()
 
         players[textureId] = instance
-        result(textureId)
+        completion(.success(textureId))
     }
 
-    private func handleDispose(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let playerId = playerIdFrom(call, result: result) else { return }
+    func dispose(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
         disposePlayer(playerId)
-        result(nil)
+        completion(.success(()))
     }
 
     private func disposePlayer(_ playerId: Int64) {
@@ -207,197 +167,230 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
     }
 
     // =========================================================================
-    // MARK: - Playback
+    // MARK: - AvPlayerHostApi: Playback
     // =========================================================================
 
-    private func handleSeekTo(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let positionMs = (args["position"] as? NSNumber)?.int64Value else {
-            result(FlutterError(code: "INVALID_ARGS", message: "position is required.", details: nil))
-            return
-        }
-        let time = CMTime(value: positionMs, timescale: 1000)
-        instance.player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
-            result(nil)
-        }
-    }
-
-    private func handleSetPlaybackSpeed(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let speed = (args["speed"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "speed is required.", details: nil))
-            return
-        }
-        instance.playbackSpeed = speed
-        if instance.player.rate != 0 {
-            instance.player.rate = speed
-        }
-        result(nil)
-    }
-
-    private func handleSetLooping(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let looping = args["looping"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "looping is required.", details: nil))
-            return
-        }
-        instance.isLooping = looping
-        result(nil)
-    }
-
-    private func handleSetVolume(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let volume = (args["volume"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "volume is required.", details: nil))
-            return
-        }
-        instance.player.volume = max(0, min(1, volume))
-        result(nil)
-    }
-
-    // =========================================================================
-    // MARK: - PIP
-    // =========================================================================
-
-    private func handleEnterPip(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let pipController = instance.pipController else {
-            result(FlutterError(code: "PIP_UNAVAILABLE", message: "PIP is not available.", details: nil))
-            return
-        }
-        pipController.startPictureInPicture()
-        result(nil)
-    }
-
-    private func handleExitPip(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        instance.pipController?.stopPictureInPicture()
-        result(nil)
-    }
-
-    // =========================================================================
-    // MARK: - System Controls
-    // =========================================================================
-
-    private func handleSetScreenBrightness(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let brightness = (args["brightness"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "brightness is required.", details: nil))
-            return
-        }
-        UIScreen.main.brightness = CGFloat(max(0, min(1, brightness)))
-        result(nil)
-    }
-
-    private func handleSetWakelock(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let enabled = args["enabled"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "enabled is required.", details: nil))
-            return
-        }
-        UIApplication.shared.isIdleTimerDisabled = enabled
-        result(nil)
-    }
-
-    // =========================================================================
-    // MARK: - Media Session
-    // =========================================================================
-
-    private func handleSetMediaMetadata(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Arguments required.", details: nil))
-            return
-        }
-
-        instance.metadataTitle = args["title"] as? String
-        instance.metadataArtist = args["artist"] as? String
-        instance.metadataAlbum = args["album"] as? String
-        let artworkUrl = args["artworkUrl"] as? String
-
-        instance.updateNowPlayingInfo()
-
-        // Load artwork in background if URL changed
-        if let urlString = artworkUrl, urlString != instance.artworkUrl {
-            instance.artworkUrl = urlString
-            if let url = URL(string: urlString) {
-                URLSession.shared.dataTask(with: url) { [weak instance] data, _, _ in
-                    guard let instance = instance, let data = data, let image = UIImage(data: data) else { return }
-                    DispatchQueue.main.async {
-                        instance.artworkImage = image
-                        instance.updateNowPlayingInfo()
-                    }
-                }.resume()
+    func play(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.player.play()
+            if instance.playbackSpeed != 1.0 {
+                instance.player.rate = instance.playbackSpeed
             }
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
         }
-
-        result(nil)
     }
 
-    private func handleSetNotificationEnabled(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let enabled = args["enabled"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "enabled is required.", details: nil))
-            return
+    func pause(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.player.pause()
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
         }
+    }
 
-        instance.notificationEnabled = enabled
+    func seekTo(playerId: Int64, positionMs: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            let time = CMTime(value: positionMs, timescale: 1000)
+            instance.player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                completion(.success(()))
+            }
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
 
-        if enabled {
-            instance.setupRemoteCommands()
+    func setPlaybackSpeed(playerId: Int64, speed: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.playbackSpeed = Float(speed)
+            if instance.player.rate != 0 {
+                instance.player.rate = Float(speed)
+            }
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    func setLooping(playerId: Int64, looping: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.isLooping = looping
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    func setVolume(playerId: Int64, volume: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.player.volume = max(0, min(1, Float(volume)))
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - AvPlayerHostApi: PIP
+    // =========================================================================
+
+    func isPipAvailable(completion: @escaping (Result<Bool, Error>) -> Void) {
+        completion(.success(AVPictureInPictureController.isPictureInPictureSupported()))
+    }
+
+    func enterPip(request: EnterPipRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(request.playerId) {
+        case .success(let instance):
+            guard let pipController = instance.pipController else {
+                completion(.failure(PigeonError(code: "PIP_UNAVAILABLE", message: "PIP is not available.", details: nil)))
+                return
+            }
+            pipController.startPictureInPicture()
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    func exitPip(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.pipController?.stopPictureInPicture()
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - AvPlayerHostApi: Performance
+    // =========================================================================
+
+    func setAbrConfig(request: SetAbrConfigRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(request.playerId) {
+        case .success(let instance):
+            if let maxBitrate = request.config.maxBitrateBps {
+                instance.playerItem.preferredPeakBitRate = Double(maxBitrate)
+            }
+            if let maxWidth = request.config.preferredMaxWidth,
+               let maxHeight = request.config.preferredMaxHeight {
+                if #available(iOS 11.0, *) {
+                    instance.playerItem.preferredMaximumResolution = CGSize(
+                        width: CGFloat(maxWidth), height: CGFloat(maxHeight))
+                }
+            }
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
+        }
+    }
+
+    func getDecoderInfo(playerId: Int64, completion: @escaping (Result<DecoderInfoMessage, Error>) -> Void) {
+        var hwH264 = false
+        var hwHEVC = false
+        if #available(iOS 11.0, *) {
+            hwH264 = VTIsHardwareDecodeSupported(kCMVideoCodecType_H264)
+            hwHEVC = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
+        }
+        let isHW = hwH264 || hwHEVC
+        var codecName: String? = nil
+        if hwHEVC { codecName = "HEVC" }
+        else if hwH264 { codecName = "H.264" }
+        completion(.success(DecoderInfoMessage(
+            isHardwareAccelerated: isHW,
+            decoderName: isHW ? "VideoToolbox" : nil,
+            codec: codecName
+        )))
+    }
+
+    // =========================================================================
+    // MARK: - AvPlayerHostApi: System Controls
+    // =========================================================================
+
+    func setSystemVolume(volume: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        completion(.failure(PigeonError(
+            code: "UNSUPPORTED",
+            message: "iOS does not support programmatic system volume changes.",
+            details: nil
+        )))
+    }
+
+    func getSystemVolume(completion: @escaping (Result<Double, Error>) -> Void) {
+        completion(.success(Double(AVAudioSession.sharedInstance().outputVolume)))
+    }
+
+    func setScreenBrightness(brightness: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        UIScreen.main.brightness = CGFloat(max(0, min(1, brightness)))
+        completion(.success(()))
+    }
+
+    func getScreenBrightness(completion: @escaping (Result<Double, Error>) -> Void) {
+        completion(.success(Double(UIScreen.main.brightness)))
+    }
+
+    func setWakelock(enabled: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        UIApplication.shared.isIdleTimerDisabled = enabled
+        completion(.success(()))
+    }
+
+    // =========================================================================
+    // MARK: - AvPlayerHostApi: Media Session
+    // =========================================================================
+
+    func setMediaMetadata(request: MediaMetadataRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(request.playerId) {
+        case .success(let instance):
+            instance.metadataTitle = request.metadata.title
+            instance.metadataArtist = request.metadata.artist
+            instance.metadataAlbum = request.metadata.album
+            let artworkUrl = request.metadata.artworkUrl
+
             instance.updateNowPlayingInfo()
-        } else {
-            instance.tearDownRemoteCommands()
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+
+            // Load artwork in background if URL changed
+            if let urlString = artworkUrl, urlString != instance.artworkUrl {
+                instance.artworkUrl = urlString
+                if let url = URL(string: urlString) {
+                    URLSession.shared.dataTask(with: url) { [weak instance] data, _, _ in
+                        guard let instance = instance, let data = data, let image = UIImage(data: data) else { return }
+                        DispatchQueue.main.async {
+                            instance.artworkImage = image
+                            instance.updateNowPlayingInfo()
+                        }
+                    }.resume()
+                }
+            }
+
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
         }
-
-        result(nil)
     }
 
-    // =========================================================================
-    // MARK: - Helpers
-    // =========================================================================
+    func setNotificationEnabled(playerId: Int64, enabled: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        switch getPlayer(playerId) {
+        case .success(let instance):
+            instance.notificationEnabled = enabled
 
-    private func withPlayer(_ call: FlutterMethodCall, result: @escaping FlutterResult, action: (PlayerInstance) -> Void) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        action(instance)
-        result(nil)
-    }
+            if enabled {
+                instance.setupRemoteCommands()
+                instance.updateNowPlayingInfo()
+            } else {
+                instance.tearDownRemoteCommands()
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            }
 
-    private func getPlayer(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> PlayerInstance? {
-        guard let playerId = playerIdFrom(call, result: result) else { return nil }
-        guard let instance = players[playerId] else {
-            result(FlutterError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil))
-            return nil
-        }
-        return instance
-    }
-
-    private func playerIdFrom(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> Int64? {
-        guard let args = call.arguments as? [String: Any],
-              let playerId = (args["playerId"] as? NSNumber)?.int64Value else {
-            result(FlutterError(code: "INVALID_ARGS", message: "playerId is required.", details: nil))
-            return nil
-        }
-        return playerId
-    }
-
-    private static var keyWindowRootView: UIView? {
-        if #available(iOS 15.0, *) {
-            return UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first(where: { $0.isKeyWindow })?
-                .rootViewController?.view
-        } else {
-            return UIApplication.shared.windows
-                .first(where: { $0.isKeyWindow })?
-                .rootViewController?.view
+            completion(.success(()))
+        case .failure(let error):
+            completion(.failure(error))
         }
     }
 }
@@ -430,6 +423,8 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
     private var remoteCommandsRegistered = false
     private var isInitialized = false
     private var isDisposed = false
+    private var memoryWarningObserver: NSObjectProtocol?
+    private var accessLogObserver: NSObjectProtocol?
 
     private var lastPixelBuffer: CVPixelBuffer?
     private let pixelBufferLock = NSLock()
@@ -524,6 +519,36 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
             name: .AVPlayerItemDidPlayToEndTime,
             object: playerItem
         )
+
+        // Memory pressure
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.eventSink.success([
+                "type": "memoryPressure",
+                "level": "critical",
+            ])
+        }
+
+        // ABR info from access log
+        accessLogObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemNewAccessLogEntry,
+            object: playerItem,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self,
+                  let event = self.playerItem.accessLog()?.events.last else { return }
+            let bitrate = Int64(event.indicatedBitrate)
+            if bitrate > 0 {
+                self.eventSink.success([
+                    "type": "abrInfo",
+                    "currentBitrateBps": bitrate,
+                    "availableBitrateBps": [bitrate],
+                ])
+            }
+        }
     }
 
     private func handleStatusChange(_ status: AVPlayerItem.Status) {
@@ -775,6 +800,15 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
         timeControlStatusObservation = nil
 
         NotificationCenter.default.removeObserver(self)
+
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+            memoryWarningObserver = nil
+        }
+        if let observer = accessLogObserver {
+            NotificationCenter.default.removeObserver(observer)
+            accessLogObserver = nil
+        }
 
         pipController?.delegate = nil
         pipController = nil

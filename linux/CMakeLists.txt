@@ -11,6 +11,7 @@ pkg_check_modules(PULSE REQUIRED libpulse)
 
 list(APPEND PLUGIN_SOURCES
   "av_player_linux_plugin.cc"
+  "messages.g.cc"
   "player_instance.cc"
   "mpris_controller.cc"
   "system_controls.cc"

@@ -217,6 +217,20 @@ class AvPlayerWeb extends AvPlayerPlatform {
   }
 
   // ===========================================================================
+  // Performance
+  // ===========================================================================
+
+  @override
+  Future<void> setAbrConfig(int playerId, AVAbrConfig config) async {
+    // Browser handles adaptive streaming internally — no-op.
+  }
+
+  @override
+  Future<AVDecoderInfo> getDecoderInfo(int playerId) async {
+    return AVDecoderInfo.unknown;
+  }
+
+  // ===========================================================================
   // Events
   // ===========================================================================
 

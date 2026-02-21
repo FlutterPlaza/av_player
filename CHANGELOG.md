@@ -1,4 +1,23 @@
 
+# 0.4.0
+
+## Added
+- Pigeon migration — type-safe Dart-to-native communication for all 5 native platforms (Android, iOS, macOS, Windows, Linux)
+- Adaptive bitrate streaming (ABR) configuration API (`setAbrConfig`, `AVAbrConfig`, `AVAbrInfoEvent`)
+- Hardware decoder info query (`getDecoderInfo`, `AVDecoderInfo`)
+- Memory pressure monitoring with automatic quality reduction (`AVMemoryPressureEvent`, `AVMemoryPressureLevel`)
+- Android: ExoPlayer `DefaultTrackSelector` for ABR, `MediaCodecList` for decoder info, `ComponentCallbacks2` for memory pressure
+- iOS: `preferredPeakBitRate`/`preferredMaximumResolution` for ABR, VideoToolbox for decoder info, memory warning observer
+- macOS: Same AVFoundation/VideoToolbox APIs as iOS, `DispatchSource.makeMemoryPressureSource` for memory pressure
+- Windows: D3D11VideoDevice for decoder info, `CreateMemoryResourceNotification` for memory pressure
+- Linux: `/proc/meminfo` polling for memory pressure
+- 22 new tests (334 total), all passing
+
+## Changed
+- All 5 native plugins now use Pigeon-generated `AvPlayerHostApi` interfaces instead of hand-written MethodChannel dispatch
+- Shared `PigeonAvPlayer` Dart adapter base class — platform implementations are thin wrappers
+- EventChannels preserved unchanged (Pigeon doesn't generate EventChannel code)
+
 # 0.3.0
 
 ## Added

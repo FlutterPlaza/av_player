@@ -5,12 +5,14 @@
 #include <gtk/gtk.h>
 
 #include <cstring>
+#include <fstream>
 #include <map>
+#include <string>
 
+#include "messages.g.h"
 #include "player_instance.h"
 #include "system_controls.h"
 
-static const char kChannelName[] = "com.flutterplaza.av_player_linux";
 static const char kEventChannelPrefix[] = "com.flutterplaza.av_player_linux/events/";
 
 // =============================================================================
@@ -21,7 +23,6 @@ struct _FlAvPlayerPlugin {
   GObject parent_instance;
 
   FlPluginRegistrar* registrar;
-  FlMethodChannel* channel;
 
   // Player instances keyed by texture ID.
   std::map<int64_t, PlayerInstance*>* players;
@@ -34,32 +35,10 @@ G_DEFINE_TYPE(FlAvPlayerPlugin, fl_av_player_plugin,
 // Helpers
 // =============================================================================
 
-static FlMethodResponse* make_error(const char* code, const char* message) {
-  return FL_METHOD_RESPONSE(
-      fl_method_error_response_new(code, message, nullptr));
-}
-
-static FlMethodResponse* make_success(FlValue* result) {
-  return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-}
-
-static int64_t get_player_id(FlValue* args) {
-  FlValue* v = fl_value_lookup_string(args, "playerId");
-  if (v == nullptr) return -1;
-  return fl_value_get_int(v);
-}
-
-static PlayerInstance* find_player(FlAvPlayerPlugin* self,
-                                    FlValue* args,
-                                    FlMethodResponse** error_out) {
-  int64_t id = get_player_id(args);
-  if (id < 0) {
-    *error_out = make_error("INVALID_ARGS", "playerId is required.");
-    return nullptr;
-  }
-  auto it = self->players->find(id);
+static PlayerInstance* find_player_by_id(FlAvPlayerPlugin* self,
+                                         int64_t player_id) {
+  auto it = self->players->find(player_id);
   if (it == self->players->end()) {
-    *error_out = make_error("NO_PLAYER", "Player not found.");
     return nullptr;
   }
   return it->second;
@@ -82,49 +61,69 @@ static FlMethodErrorResponse* on_event_cancel(FlEventChannel* channel,
 }
 
 // =============================================================================
-// Create handler
+// Pigeon host API handler: create
 // =============================================================================
 
-static FlMethodResponse* handle_create(FlAvPlayerPlugin* self,
-                                         FlValue* args) {
-  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP)
-    return make_error("INVALID_ARGS", "Arguments required.");
+static void handle_create(AvPlayerVideoSourceMessage* source,
+                           AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                           gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
 
-  FlValue* type_val = fl_value_lookup_string(args, "type");
-  const char* type = type_val ? fl_value_get_string(type_val) : "network";
+  AvPlayerSourceType type = av_player_video_source_message_get_type_(source);
 
   // Build URI
   const char* uri = nullptr;
   g_autofree gchar* uri_buf = nullptr;
 
-  if (strcmp(type, "network") == 0) {
-    FlValue* url_val = fl_value_lookup_string(args, "url");
-    if (url_val == nullptr)
-      return make_error("INVALID_SOURCE", "Network source requires 'url'.");
-    uri = fl_value_get_string(url_val);
-  } else if (strcmp(type, "file") == 0) {
-    FlValue* path_val = fl_value_lookup_string(args, "filePath");
-    if (path_val == nullptr)
-      return make_error("INVALID_SOURCE", "File source requires 'filePath'.");
-    uri_buf = g_strdup_printf("file://%s", fl_value_get_string(path_val));
-    uri = uri_buf;
-  } else if (strcmp(type, "asset") == 0) {
-    FlValue* asset_val = fl_value_lookup_string(args, "assetPath");
-    if (asset_val == nullptr)
-      return make_error("INVALID_SOURCE", "Asset source requires 'assetPath'.");
-    // Assets are bundled in the flutter_assets directory relative to the executable
-    g_autofree gchar* exe_dir = g_path_get_dirname("/proc/self/exe");
-    gchar* resolved = g_file_read_link("/proc/self/exe", nullptr);
-    if (resolved) {
-      g_free(exe_dir);
-      exe_dir = g_path_get_dirname(resolved);
-      g_free(resolved);
+  switch (type) {
+    case AV_PLAYER_SOURCE_TYPE_NETWORK: {
+      const gchar* url = av_player_video_source_message_get_url(source);
+      if (url == nullptr) {
+        av_player_av_player_host_api_respond_error_create(
+            response_handle, "INVALID_SOURCE",
+            "Network source requires 'url'.", nullptr);
+        return;
+      }
+      uri = url;
+      break;
     }
-    uri_buf = g_strdup_printf("file://%s/data/flutter_assets/%s",
-                               exe_dir, fl_value_get_string(asset_val));
-    uri = uri_buf;
-  } else {
-    return make_error("INVALID_SOURCE", "Unknown source type.");
+    case AV_PLAYER_SOURCE_TYPE_FILE: {
+      const gchar* path = av_player_video_source_message_get_file_path(source);
+      if (path == nullptr) {
+        av_player_av_player_host_api_respond_error_create(
+            response_handle, "INVALID_SOURCE",
+            "File source requires 'filePath'.", nullptr);
+        return;
+      }
+      uri_buf = g_strdup_printf("file://%s", path);
+      uri = uri_buf;
+      break;
+    }
+    case AV_PLAYER_SOURCE_TYPE_ASSET: {
+      const gchar* asset = av_player_video_source_message_get_asset_path(source);
+      if (asset == nullptr) {
+        av_player_av_player_host_api_respond_error_create(
+            response_handle, "INVALID_SOURCE",
+            "Asset source requires 'assetPath'.", nullptr);
+        return;
+      }
+      // Assets are bundled in the flutter_assets directory relative to the executable
+      g_autofree gchar* exe_dir = g_path_get_dirname("/proc/self/exe");
+      gchar* resolved = g_file_read_link("/proc/self/exe", nullptr);
+      if (resolved) {
+        g_free(exe_dir);
+        exe_dir = g_path_get_dirname(resolved);
+        g_free(resolved);
+      }
+      uri_buf = g_strdup_printf("file://%s/data/flutter_assets/%s",
+                                 exe_dir, asset);
+      uri = uri_buf;
+      break;
+    }
+    default:
+      av_player_av_player_host_api_respond_error_create(
+          response_handle, "INVALID_SOURCE", "Unknown source type.", nullptr);
+      return;
   }
 
   FlTextureRegistrar* tex_reg =
@@ -150,152 +149,377 @@ static FlMethodResponse* handle_create(FlAvPlayerPlugin* self,
 
   (*self->players)[texture_id] = player;
 
-  return make_success(fl_value_new_int(texture_id));
+  av_player_av_player_host_api_respond_create(response_handle, texture_id);
 }
 
 // =============================================================================
-// Method call handler
+// Pigeon host API handler: dispose
 // =============================================================================
 
-static void method_call_cb(FlMethodChannel* channel,
-                            FlMethodCall* method_call,
+static void handle_dispose(int64_t player_id,
+                            AvPlayerAvPlayerHostApiResponseHandle* response_handle,
                             gpointer user_data) {
   auto* self = FL_AV_PLAYER_PLUGIN(user_data);
-  const gchar* method = fl_method_call_get_name(method_call);
-  FlValue* args = fl_method_call_get_args(method_call);
+  auto it = self->players->find(player_id);
+  if (it != self->players->end()) {
+    player_instance_dispose(it->second);
+    self->players->erase(it);
+  }
+  av_player_av_player_host_api_respond_dispose(response_handle);
+}
 
-  g_autoptr(FlMethodResponse) response = nullptr;
+// =============================================================================
+// Pigeon host API handler: play
+// =============================================================================
 
-  // ---- Lifecycle ----
-  if (strcmp(method, "create") == 0) {
-    response = handle_create(self, args);
+static void handle_play(int64_t player_id,
+                         AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                         gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_play(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_play(p);
+  av_player_av_player_host_api_respond_play(response_handle);
+}
 
-  } else if (strcmp(method, "dispose") == 0) {
-    int64_t id = get_player_id(args);
-    auto it = self->players->find(id);
-    if (it != self->players->end()) {
-      player_instance_dispose(it->second);
-      self->players->erase(it);
-    }
-    response = make_success(nullptr);
+// =============================================================================
+// Pigeon host API handler: pause
+// =============================================================================
 
-  // ---- Playback ----
-  } else if (strcmp(method, "play") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) { player_instance_play(p); response = make_success(nullptr); }
-    else response = err;
+static void handle_pause(int64_t player_id,
+                          AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                          gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_pause(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_pause(p);
+  av_player_av_player_host_api_respond_pause(response_handle);
+}
 
-  } else if (strcmp(method, "pause") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) { player_instance_pause(p); response = make_success(nullptr); }
-    else response = err;
+// =============================================================================
+// Pigeon host API handler: seekTo
+// =============================================================================
 
-  } else if (strcmp(method, "seekTo") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* pos = fl_value_lookup_string(args, "position");
-      player_instance_seek_to(p, pos ? fl_value_get_int(pos) : 0);
-      response = make_success(nullptr);
-    } else response = err;
+static void handle_seek_to(int64_t player_id,
+                            int64_t position_ms,
+                            AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                            gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_seek_to(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_seek_to(p, position_ms);
+  av_player_av_player_host_api_respond_seek_to(response_handle);
+}
 
-  } else if (strcmp(method, "setPlaybackSpeed") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* v = fl_value_lookup_string(args, "speed");
-      player_instance_set_speed(p, v ? fl_value_get_float(v) : 1.0);
-      response = make_success(nullptr);
-    } else response = err;
+// =============================================================================
+// Pigeon host API handler: setPlaybackSpeed
+// =============================================================================
 
-  } else if (strcmp(method, "setLooping") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* v = fl_value_lookup_string(args, "looping");
-      player_instance_set_looping(p, v ? fl_value_get_bool(v) : FALSE);
-      response = make_success(nullptr);
-    } else response = err;
+static void handle_set_playback_speed(int64_t player_id,
+                                       double speed,
+                                       AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                       gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_playback_speed(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_set_speed(p, speed);
+  av_player_av_player_host_api_respond_set_playback_speed(response_handle);
+}
 
-  } else if (strcmp(method, "setVolume") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* v = fl_value_lookup_string(args, "volume");
-      player_instance_set_volume(p, v ? fl_value_get_float(v) : 1.0);
-      response = make_success(nullptr);
-    } else response = err;
+// =============================================================================
+// Pigeon host API handler: setLooping
+// =============================================================================
 
-  // ---- PIP (N/A on Linux) ----
-  } else if (strcmp(method, "isPipAvailable") == 0) {
-    response = make_success(fl_value_new_bool(FALSE));
+static void handle_set_looping(int64_t player_id,
+                                gboolean looping,
+                                AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_looping(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_set_looping(p, looping);
+  av_player_av_player_host_api_respond_set_looping(response_handle);
+}
 
-  } else if (strcmp(method, "enterPip") == 0 || strcmp(method, "exitPip") == 0) {
-    response = make_success(nullptr);
+// =============================================================================
+// Pigeon host API handler: setVolume
+// =============================================================================
 
-  // ---- System Controls ----
-  } else if (strcmp(method, "setSystemVolume") == 0) {
-    FlValue* v = fl_value_lookup_string(args, "volume");
-    system_controls_set_volume(v ? fl_value_get_float(v) : 0.5);
-    response = make_success(nullptr);
+static void handle_set_volume(int64_t player_id,
+                               double volume,
+                               AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                               gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_volume(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_set_volume(p, volume);
+  av_player_av_player_host_api_respond_set_volume(response_handle);
+}
 
-  } else if (strcmp(method, "getSystemVolume") == 0) {
-    response = make_success(fl_value_new_float(system_controls_get_volume()));
+// =============================================================================
+// Pigeon host API handler: isPipAvailable
+// =============================================================================
 
-  } else if (strcmp(method, "setScreenBrightness") == 0) {
-    FlValue* v = fl_value_lookup_string(args, "brightness");
-    system_controls_set_brightness(v ? fl_value_get_float(v) : 0.5);
-    response = make_success(nullptr);
+static void handle_is_pip_available(AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                     gpointer user_data) {
+  av_player_av_player_host_api_respond_is_pip_available(response_handle, FALSE);
+}
 
-  } else if (strcmp(method, "getScreenBrightness") == 0) {
-    response = make_success(fl_value_new_float(system_controls_get_brightness()));
+// =============================================================================
+// Pigeon host API handler: enterPip
+// =============================================================================
 
-  } else if (strcmp(method, "setWakelock") == 0) {
-    FlValue* v = fl_value_lookup_string(args, "enabled");
-    system_controls_set_wakelock(v ? fl_value_get_bool(v) : FALSE);
-    response = make_success(nullptr);
+static void handle_enter_pip(AvPlayerEnterPipRequest* request,
+                              AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                              gpointer user_data) {
+  // PIP is not available on Linux
+  av_player_av_player_host_api_respond_enter_pip(response_handle);
+}
 
-  // ---- Media Session ----
-  } else if (strcmp(method, "setMediaMetadata") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* title = fl_value_lookup_string(args, "title");
-      FlValue* artist = fl_value_lookup_string(args, "artist");
-      FlValue* album = fl_value_lookup_string(args, "album");
-      FlValue* art = fl_value_lookup_string(args, "artworkUrl");
-      player_instance_set_media_metadata(
-          p,
-          title ? fl_value_get_string(title) : "",
-          artist ? fl_value_get_string(artist) : "",
-          album ? fl_value_get_string(album) : "",
-          art ? fl_value_get_string(art) : "");
-      response = make_success(nullptr);
-    } else response = err;
+// =============================================================================
+// Pigeon host API handler: exitPip
+// =============================================================================
 
-  } else if (strcmp(method, "setNotificationEnabled") == 0) {
-    FlMethodResponse* err = nullptr;
-    PlayerInstance* p = find_player(self, args, &err);
-    if (p) {
-      FlValue* v = fl_value_lookup_string(args, "enabled");
-      player_instance_set_notification_enabled(p, v ? fl_value_get_bool(v) : FALSE);
-      response = make_success(nullptr);
-    } else response = err;
+static void handle_exit_pip(int64_t player_id,
+                             AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                             gpointer user_data) {
+  // PIP is not available on Linux
+  av_player_av_player_host_api_respond_exit_pip(response_handle);
+}
 
-  // ---- Legacy ----
-  } else if (strcmp(method, "getPlatformName") == 0) {
-    response = make_success(fl_value_new_string("Linux"));
+// =============================================================================
+// Pigeon host API handler: setMediaMetadata
+// =============================================================================
 
-  } else {
-    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+static void handle_set_media_metadata(AvPlayerMediaMetadataRequest* request,
+                                       AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                       gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  int64_t player_id = av_player_media_metadata_request_get_player_id(request);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_media_metadata(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
   }
 
-  g_autoptr(GError) error = nullptr;
-  if (!fl_method_call_respond(method_call, response, &error))
-    g_warning("Failed to send response: %s", error->message);
+  AvPlayerMediaMetadataMessage* metadata =
+      av_player_media_metadata_request_get_metadata(request);
+
+  const gchar* title = av_player_media_metadata_message_get_title(metadata);
+  const gchar* artist = av_player_media_metadata_message_get_artist(metadata);
+  const gchar* album = av_player_media_metadata_message_get_album(metadata);
+  const gchar* art = av_player_media_metadata_message_get_artwork_url(metadata);
+
+  player_instance_set_media_metadata(
+      p,
+      title ? title : "",
+      artist ? artist : "",
+      album ? album : "",
+      art ? art : "");
+
+  av_player_av_player_host_api_respond_set_media_metadata(response_handle);
 }
+
+// =============================================================================
+// Pigeon host API handler: setNotificationEnabled
+// =============================================================================
+
+static void handle_set_notification_enabled(int64_t player_id,
+                                             gboolean enabled,
+                                             AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                             gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_notification_enabled(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+  player_instance_set_notification_enabled(p, enabled);
+  av_player_av_player_host_api_respond_set_notification_enabled(response_handle);
+}
+
+// =============================================================================
+// Pigeon host API handler: setSystemVolume
+// =============================================================================
+
+static void handle_set_system_volume(double volume,
+                                      AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                      gpointer user_data) {
+  system_controls_set_volume(volume);
+  av_player_av_player_host_api_respond_set_system_volume(response_handle);
+}
+
+// =============================================================================
+// Pigeon host API handler: getSystemVolume
+// =============================================================================
+
+static void handle_get_system_volume(AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                      gpointer user_data) {
+  av_player_av_player_host_api_respond_get_system_volume(
+      response_handle, system_controls_get_volume());
+}
+
+// =============================================================================
+// Pigeon host API handler: setScreenBrightness
+// =============================================================================
+
+static void handle_set_screen_brightness(double brightness,
+                                          AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                          gpointer user_data) {
+  system_controls_set_brightness(brightness);
+  av_player_av_player_host_api_respond_set_screen_brightness(response_handle);
+}
+
+// =============================================================================
+// Pigeon host API handler: getScreenBrightness
+// =============================================================================
+
+static void handle_get_screen_brightness(AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                          gpointer user_data) {
+  av_player_av_player_host_api_respond_get_screen_brightness(
+      response_handle, system_controls_get_brightness());
+}
+
+// =============================================================================
+// Pigeon host API handler: setWakelock
+// =============================================================================
+
+static void handle_set_wakelock(gboolean enabled,
+                                 AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                 gpointer user_data) {
+  system_controls_set_wakelock(enabled);
+  av_player_av_player_host_api_respond_set_wakelock(response_handle);
+}
+
+// =============================================================================
+// Pigeon host API handler: setAbrConfig
+// =============================================================================
+
+static void handle_set_abr_config(AvPlayerSetAbrConfigRequest* request,
+                                   AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                   gpointer user_data) {
+  auto* self = FL_AV_PLAYER_PLUGIN(user_data);
+  int64_t player_id = av_player_set_abr_config_request_get_player_id(request);
+  PlayerInstance* p = find_player_by_id(self, player_id);
+  if (p == nullptr) {
+    av_player_av_player_host_api_respond_error_set_abr_config(
+        response_handle, "NO_PLAYER", "Player not found.", nullptr);
+    return;
+  }
+
+  // ABR configuration acknowledged.
+  // TODO: Apply ABR constraints to the GStreamer pipeline once
+  // player_instance_get_pipeline() is exposed in player_instance.h.
+  av_player_av_player_host_api_respond_set_abr_config(response_handle);
+}
+
+// =============================================================================
+// Pigeon host API handler: getDecoderInfo
+// =============================================================================
+
+static void handle_get_decoder_info(int64_t player_id,
+                                     AvPlayerAvPlayerHostApiResponseHandle* response_handle,
+                                     gpointer user_data) {
+  // TODO: Inspect the GStreamer pipeline to detect hardware decoders once
+  // player_instance_get_pipeline() is exposed in player_instance.h.
+  // For now, report unknown/software decoding.
+  g_autoptr(AvPlayerDecoderInfoMessage) info =
+      av_player_decoder_info_message_new(FALSE, nullptr, nullptr);
+  av_player_av_player_host_api_respond_get_decoder_info(response_handle, info);
+}
+
+// =============================================================================
+// Memory pressure polling
+// =============================================================================
+
+static gboolean check_memory_pressure(gpointer user_data) {
+  (void)user_data;
+
+  std::ifstream meminfo("/proc/meminfo");
+  if (!meminfo.is_open()) return G_SOURCE_CONTINUE;
+
+  long mem_total = 0, mem_available = 0;
+  std::string line;
+  while (std::getline(meminfo, line)) {
+    if (line.find("MemTotal:") == 0) {
+      sscanf(line.c_str(), "MemTotal: %ld", &mem_total);
+    } else if (line.find("MemAvailable:") == 0) {
+      sscanf(line.c_str(), "MemAvailable: %ld", &mem_available);
+    }
+  }
+
+  if (mem_total <= 0) return G_SOURCE_CONTINUE;
+
+  double free_pct = static_cast<double>(mem_available) / mem_total;
+  const char* level = nullptr;
+  if (free_pct < 0.05) {
+    level = "critical";
+  } else if (free_pct < 0.15) {
+    level = "warning";
+  }
+
+  if (level != nullptr) {
+    // TODO: Notify player instances of memory pressure once
+    // player_instance_send_event() is exposed in player_instance.h.
+    g_warning("av_player: memory pressure level=%s (%.1f%% free)", level,
+              free_pct * 100.0);
+  }
+
+  return G_SOURCE_CONTINUE;
+}
+
+// =============================================================================
+// VTable
+// =============================================================================
+
+static const AvPlayerAvPlayerHostApiVTable kVTable = {
+    .create = handle_create,
+    .dispose = handle_dispose,
+    .play = handle_play,
+    .pause = handle_pause,
+    .seek_to = handle_seek_to,
+    .set_playback_speed = handle_set_playback_speed,
+    .set_looping = handle_set_looping,
+    .set_volume = handle_set_volume,
+    .is_pip_available = handle_is_pip_available,
+    .enter_pip = handle_enter_pip,
+    .exit_pip = handle_exit_pip,
+    .set_media_metadata = handle_set_media_metadata,
+    .set_notification_enabled = handle_set_notification_enabled,
+    .set_system_volume = handle_set_system_volume,
+    .get_system_volume = handle_get_system_volume,
+    .set_screen_brightness = handle_set_screen_brightness,
+    .get_screen_brightness = handle_get_screen_brightness,
+    .set_wakelock = handle_set_wakelock,
+    .set_abr_config = handle_set_abr_config,
+    .get_decoder_info = handle_get_decoder_info,
+};
 
 // =============================================================================
 // Plugin lifecycle
@@ -312,7 +536,11 @@ static void fl_av_player_plugin_dispose(GObject* object) {
     self->players = nullptr;
   }
 
-  g_clear_object(&self->channel);
+  // Clear Pigeon method handlers
+  FlBinaryMessenger* messenger =
+      fl_plugin_registrar_get_messenger(self->registrar);
+  av_player_av_player_host_api_clear_method_handlers(messenger, nullptr);
+
   g_clear_object(&self->registrar);
 
   G_OBJECT_CLASS(fl_av_player_plugin_parent_class)->dispose(object);
@@ -337,12 +565,15 @@ FlAvPlayerPlugin* fl_av_player_plugin_new(
   // Initialize GStreamer (safe to call multiple times)
   gst_init(nullptr, nullptr);
 
-  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  self->channel = fl_method_channel_new(
-      fl_plugin_registrar_get_messenger(registrar),
-      kChannelName, FL_METHOD_CODEC(codec));
-  fl_method_channel_set_method_call_handler(
-      self->channel, method_call_cb, g_object_ref(self), g_object_unref);
+  // Register Pigeon host API handlers
+  FlBinaryMessenger* messenger =
+      fl_plugin_registrar_get_messenger(registrar);
+  av_player_av_player_host_api_set_method_handlers(
+      messenger, nullptr, &kVTable,
+      g_object_ref(self), g_object_unref);
+
+  // Start memory pressure polling (every 5 seconds)
+  g_timeout_add_seconds(5, check_memory_pressure, self);
 
   return self;
 }

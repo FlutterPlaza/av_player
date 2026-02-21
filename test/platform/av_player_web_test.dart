@@ -260,6 +260,30 @@ void main() {
     });
 
     // =========================================================================
+    // Performance
+    // =========================================================================
+
+    test('setAbrConfig() completes (no-op on web)', () async {
+      final id = await plugin.create(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      await expectLater(
+        plugin.setAbrConfig(id, const AVAbrConfig(maxBitrateBps: 5000000)),
+        completes,
+      );
+    });
+
+    test('getDecoderInfo() returns unknown on web', () async {
+      final id = await plugin.create(
+        const AVVideoSource.network('https://example.com/video.mp4'),
+      );
+      final info = await plugin.getDecoderInfo(id);
+      expect(info.isHardwareAccelerated, false);
+      expect(info.decoderName, isNull);
+      expect(info.codec, isNull);
+    });
+
+    // =========================================================================
     // Events
     // =========================================================================
 

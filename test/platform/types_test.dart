@@ -281,6 +281,39 @@ void main() {
       expect((event as AVMediaCommandEvent).command, AVMediaCommand.play);
     });
 
+    test('parses abrInfo event', () {
+      final event = AVPlayerEvent.fromMap({
+        'type': 'abrInfo',
+        'currentBitrateBps': 5000000,
+        'availableBitrateBps': [2000000, 5000000, 8000000],
+      });
+      expect(event, isA<AVAbrInfoEvent>());
+      final e = event as AVAbrInfoEvent;
+      expect(e.currentBitrateBps, 5000000);
+      expect(e.availableBitrateBps, [2000000, 5000000, 8000000]);
+    });
+
+    test('parses memoryPressure event', () {
+      for (final level in AVMemoryPressureLevel.values) {
+        final event = AVPlayerEvent.fromMap({
+          'type': 'memoryPressure',
+          'level': level.name,
+        });
+        expect(event, isA<AVMemoryPressureEvent>());
+        expect((event as AVMemoryPressureEvent).level, level);
+      }
+    });
+
+    test('parses memoryPressure with unknown level defaults to normal', () {
+      final event = AVPlayerEvent.fromMap({
+        'type': 'memoryPressure',
+        'level': 'nonexistent',
+      });
+      expect(event, isA<AVMemoryPressureEvent>());
+      expect((event as AVMemoryPressureEvent).level,
+          AVMemoryPressureLevel.normal);
+    });
+
     test('unknown event type returns error event', () {
       final event = AVPlayerEvent.fromMap({'type': 'unknownType'});
       expect(event, isA<AVErrorEvent>());
@@ -316,6 +349,72 @@ void main() {
       expect(AVMediaCommand.values, contains(AVMediaCommand.previous));
       expect(AVMediaCommand.values, contains(AVMediaCommand.seekTo));
       expect(AVMediaCommand.values, contains(AVMediaCommand.stop));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AVAbrConfig
+  // ---------------------------------------------------------------------------
+
+  group('AVAbrConfig', () {
+    test('stores all fields', () {
+      const config = AVAbrConfig(
+        maxBitrateBps: 5000000,
+        minBitrateBps: 500000,
+        preferredMaxWidth: 1920,
+        preferredMaxHeight: 1080,
+      );
+      expect(config.maxBitrateBps, 5000000);
+      expect(config.minBitrateBps, 500000);
+      expect(config.preferredMaxWidth, 1920);
+      expect(config.preferredMaxHeight, 1080);
+    });
+
+    test('all fields are optional', () {
+      const config = AVAbrConfig();
+      expect(config.maxBitrateBps, isNull);
+      expect(config.minBitrateBps, isNull);
+      expect(config.preferredMaxWidth, isNull);
+      expect(config.preferredMaxHeight, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AVDecoderInfo
+  // ---------------------------------------------------------------------------
+
+  group('AVDecoderInfo', () {
+    test('stores all fields', () {
+      const info = AVDecoderInfo(
+        isHardwareAccelerated: true,
+        decoderName: 'VideoToolbox',
+        codec: 'HEVC',
+      );
+      expect(info.isHardwareAccelerated, true);
+      expect(info.decoderName, 'VideoToolbox');
+      expect(info.codec, 'HEVC');
+    });
+
+    test('unknown constant has sensible defaults', () {
+      expect(AVDecoderInfo.unknown.isHardwareAccelerated, false);
+      expect(AVDecoderInfo.unknown.decoderName, isNull);
+      expect(AVDecoderInfo.unknown.codec, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // AVMemoryPressureLevel
+  // ---------------------------------------------------------------------------
+
+  group('AVMemoryPressureLevel', () {
+    test('has all expected values', () {
+      expect(AVMemoryPressureLevel.values, hasLength(3));
+      expect(
+          AVMemoryPressureLevel.values, contains(AVMemoryPressureLevel.normal));
+      expect(AVMemoryPressureLevel.values,
+          contains(AVMemoryPressureLevel.warning));
+      expect(AVMemoryPressureLevel.values,
+          contains(AVMemoryPressureLevel.critical));
     });
   });
 }

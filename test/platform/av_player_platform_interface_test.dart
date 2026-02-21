@@ -113,6 +113,17 @@ void main() {
         expect(() => platform.setWakelock(true), throwsUnimplementedError);
       });
 
+      test('setAbrConfig()', () {
+        expect(
+          () => platform.setAbrConfig(1, const AVAbrConfig()),
+          throwsUnimplementedError,
+        );
+      });
+
+      test('getDecoderInfo()', () {
+        expect(() => platform.getDecoderInfo(1), throwsUnimplementedError);
+      });
+
       test('playerEvents()', () {
         expect(() => platform.playerEvents(1), throwsUnimplementedError);
       });

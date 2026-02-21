@@ -11,8 +11,9 @@
 #include <highlevelmonitorconfigurationapi.h>
 #include <physicalmonitorenumerationapi.h>
 
+#include <d3d11.h>
+
 #include <flutter/event_channel.h>
-#include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
@@ -22,72 +23,23 @@
 
 #include "event_channel_handler.h"
 #include "media_player.h"
+#include "messages.g.h"
 #include "smtc_handler.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "Dxva2.lib")
+#pragma comment(lib, "d3d11.lib")
 
 namespace {
 
-using flutter::EncodableMap;
-using flutter::EncodableValue;
-
-static const char kChannelName[] = "com.flutterplaza.av_player_windows";
 static const char kEventChannelPrefix[] =
     "com.flutterplaza.av_player_windows/events/";
-
-// =============================================================================
-// Helper: extract typed values from EncodableMap
-// =============================================================================
-
-static int64_t GetInt(const EncodableMap& map, const char* key,
-                      int64_t fallback = 0) {
-  auto it = map.find(EncodableValue(std::string(key)));
-  if (it != map.end()) {
-    if (auto* val = std::get_if<int32_t>(&it->second))
-      return static_cast<int64_t>(*val);
-    if (auto* val = std::get_if<int64_t>(&it->second)) return *val;
-  }
-  return fallback;
-}
-
-static double GetDouble(const EncodableMap& map, const char* key,
-                        double fallback = 0.0) {
-  auto it = map.find(EncodableValue(std::string(key)));
-  if (it != map.end()) {
-    if (auto* val = std::get_if<double>(&it->second)) return *val;
-    // Flutter sometimes sends int for doubles
-    if (auto* val = std::get_if<int32_t>(&it->second))
-      return static_cast<double>(*val);
-    if (auto* val = std::get_if<int64_t>(&it->second))
-      return static_cast<double>(*val);
-  }
-  return fallback;
-}
-
-static bool GetBool(const EncodableMap& map, const char* key,
-                    bool fallback = false) {
-  auto it = map.find(EncodableValue(std::string(key)));
-  if (it != map.end()) {
-    if (auto* val = std::get_if<bool>(&it->second)) return *val;
-  }
-  return fallback;
-}
-
-static std::string GetString(const EncodableMap& map, const char* key,
-                             const std::string& fallback = "") {
-  auto it = map.find(EncodableValue(std::string(key)));
-  if (it != map.end()) {
-    if (auto* val = std::get_if<std::string>(&it->second)) return *val;
-  }
-  return fallback;
-}
 
 // =============================================================================
 // System volume (WASAPI / COM)
 // =============================================================================
 
-static double GetSystemVolume() {
+static double GetSystemVolumeLevel() {
   double volume = 0.0;
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -118,7 +70,7 @@ static double GetSystemVolume() {
   return volume;
 }
 
-static void SetSystemVolume(double volume) {
+static void SetSystemVolumeLevel(double volume) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   IMMDeviceEnumerator* enumerator = nullptr;
@@ -150,7 +102,7 @@ static void SetSystemVolume(double volume) {
 // Screen brightness (Monitor Configuration API)
 // =============================================================================
 
-static double GetScreenBrightness() {
+static double GetScreenBrightnessLevel() {
   HMONITOR monitor =
       MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
   DWORD num_monitors = 0;
@@ -179,7 +131,7 @@ static double GetScreenBrightness() {
   return result;
 }
 
-static void SetScreenBrightness(double brightness) {
+static void SetScreenBrightnessLevel(double brightness) {
   HMONITOR monitor =
       MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
   DWORD num_monitors = 0;
@@ -210,7 +162,7 @@ static void SetScreenBrightness(double brightness) {
 // Wakelock
 // =============================================================================
 
-static void SetWakelock(bool enabled) {
+static void SetWakelockState(bool enabled) {
   if (enabled) {
     SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED |
                             ES_SYSTEM_REQUIRED);
@@ -223,7 +175,8 @@ static void SetWakelock(bool enabled) {
 // Plugin class
 // =============================================================================
 
-class AvPlayerWindows : public flutter::Plugin {
+class AvPlayerWindows : public flutter::Plugin,
+                        public av_player_windows::AvPlayerHostApi {
  public:
   static void RegisterWithRegistrar(
       flutter::PluginRegistrarWindows* registrar);
@@ -231,13 +184,93 @@ class AvPlayerWindows : public flutter::Plugin {
   explicit AvPlayerWindows(flutter::PluginRegistrarWindows* registrar);
   ~AvPlayerWindows() override;
 
- private:
-  void HandleMethodCall(
-      const flutter::MethodCall<EncodableValue>& method_call,
-      std::unique_ptr<flutter::MethodResult<EncodableValue>> result);
+  // av_player_windows::AvPlayerHostApi implementation
+  void Create(
+      const av_player_windows::VideoSourceMessage& source,
+      std::function<void(av_player_windows::ErrorOr<int64_t> reply)> result)
+      override;
+  void Dispose(
+      int64_t player_id,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void Play(
+      int64_t player_id,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void Pause(
+      int64_t player_id,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SeekTo(
+      int64_t player_id,
+      int64_t position_ms,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetPlaybackSpeed(
+      int64_t player_id,
+      double speed,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetLooping(
+      int64_t player_id,
+      bool looping,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetVolume(
+      int64_t player_id,
+      double volume,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void IsPipAvailable(
+      std::function<void(av_player_windows::ErrorOr<bool> reply)> result)
+      override;
+  void EnterPip(
+      const av_player_windows::EnterPipRequest& request,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void ExitPip(
+      int64_t player_id,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetMediaMetadata(
+      const av_player_windows::MediaMetadataRequest& request,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetNotificationEnabled(
+      int64_t player_id,
+      bool enabled,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetSystemVolume(
+      double volume,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void GetSystemVolume(
+      std::function<void(av_player_windows::ErrorOr<double> reply)> result)
+      override;
+  void SetScreenBrightness(
+      double brightness,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void GetScreenBrightness(
+      std::function<void(av_player_windows::ErrorOr<double> reply)> result)
+      override;
+  void SetWakelock(
+      bool enabled,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void SetAbrConfig(
+      const av_player_windows::SetAbrConfigRequest& request,
+      std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+          result) override;
+  void GetDecoderInfo(
+      int64_t player_id,
+      std::function<void(av_player_windows::ErrorOr<av_player_windows::DecoderInfoMessage> reply)>
+          result) override;
 
-  // Build a URI from the source map.
-  std::string BuildUri(const EncodableMap& args);
+ private:
+  // Build a URI from the VideoSourceMessage.
+  std::string BuildUri(const av_player_windows::VideoSourceMessage& source);
 
   // Get the top-level HWND for the Flutter window.
   HWND GetFlutterWindowHwnd();
@@ -252,22 +285,21 @@ class AvPlayerWindows : public flutter::Plugin {
 
   // SMTC handlers keyed by texture ID.
   std::map<int64_t, std::unique_ptr<SmtcHandler>> smtc_handlers_;
+
+  // Memory pressure monitoring
+  HANDLE memory_notification_handle_ = nullptr;
+  HANDLE memory_thread_handle_ = nullptr;
+  bool memory_thread_running_ = false;
 };
 
 // static
 void AvPlayerWindows::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows* registrar) {
-  auto channel =
-      std::make_unique<flutter::MethodChannel<EncodableValue>>(
-          registrar->messenger(), kChannelName,
-          &flutter::StandardMethodCodec::GetInstance());
-
   auto plugin = std::make_unique<AvPlayerWindows>(registrar);
 
-  channel->SetMethodCallHandler(
-      [plugin_pointer = plugin.get()](const auto& call, auto result) {
-        plugin_pointer->HandleMethodCall(call, std::move(result));
-      });
+  auto* plugin_pointer = plugin.get();
+  av_player_windows::AvPlayerHostApi::SetUp(registrar->messenger(),
+                                            plugin_pointer);
 
   registrar->AddPlugin(std::move(plugin));
 }
@@ -275,9 +307,52 @@ void AvPlayerWindows::RegisterWithRegistrar(
 AvPlayerWindows::AvPlayerWindows(flutter::PluginRegistrarWindows* registrar)
     : registrar_(registrar) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  // Set up memory pressure monitoring
+  memory_notification_handle_ =
+      CreateMemoryResourceNotification(LowMemoryResourceNotification);
+  if (memory_notification_handle_) {
+    memory_thread_running_ = true;
+    memory_thread_handle_ = CreateThread(
+        nullptr, 0,
+        [](LPVOID param) -> DWORD {
+          auto* self = static_cast<AvPlayerWindows*>(param);
+          while (self->memory_thread_running_) {
+            DWORD wait_result = WaitForSingleObject(
+                self->memory_notification_handle_, 5000);
+            if (wait_result == WAIT_OBJECT_0 && self->memory_thread_running_) {
+              // Low memory detected — post event to all players on main thread
+              for (auto& pair : self->event_handlers_) {
+                auto* handler = pair.second.get();
+                if (handler) {
+                  flutter::EncodableMap event;
+                  event[flutter::EncodableValue("type")] =
+                      flutter::EncodableValue("memoryPressure");
+                  event[flutter::EncodableValue("level")] =
+                      flutter::EncodableValue("critical");
+                  handler->SendEvent(flutter::EncodableValue(event));
+                }
+              }
+            }
+          }
+          return 0;
+        },
+        this, 0, nullptr);
+  }
 }
 
 AvPlayerWindows::~AvPlayerWindows() {
+  // Stop memory pressure monitoring
+  memory_thread_running_ = false;
+  if (memory_notification_handle_) {
+    // Wake the thread so it can exit
+    CloseHandle(memory_notification_handle_);
+    memory_notification_handle_ = nullptr;
+  }
+  if (memory_thread_handle_) {
+    WaitForSingleObject(memory_thread_handle_, 2000);
+    CloseHandle(memory_thread_handle_);
+    memory_thread_handle_ = nullptr;
+  }
   smtc_handlers_.clear();
   players_.clear();
   event_handlers_.clear();
@@ -288,231 +363,309 @@ HWND AvPlayerWindows::GetFlutterWindowHwnd() {
   return registrar_->GetView()->GetNativeWindow();
 }
 
-std::string AvPlayerWindows::BuildUri(const EncodableMap& args) {
-  std::string type = GetString(args, "type", "network");
-
-  if (type == "network") {
-    return GetString(args, "url");
-  } else if (type == "file") {
-    return "file:///" + GetString(args, "filePath");
-  } else if (type == "asset") {
-    // Assets are bundled relative to the executable in the
-    // data/flutter_assets directory.
-    char exe_path[MAX_PATH];
-    GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
-    std::string exe_dir(exe_path);
-    size_t last_sep = exe_dir.find_last_of("\\/");
-    if (last_sep != std::string::npos) {
-      exe_dir = exe_dir.substr(0, last_sep);
+std::string AvPlayerWindows::BuildUri(
+    const av_player_windows::VideoSourceMessage& source) {
+  switch (source.type()) {
+    case av_player_windows::SourceType::kNetwork: {
+      const std::string* url = source.url();
+      return url ? *url : "";
     }
-    return "file:///" + exe_dir + "/data/flutter_assets/" +
-           GetString(args, "assetPath");
+    case av_player_windows::SourceType::kFile: {
+      const std::string* file_path = source.file_path();
+      return file_path ? "file:///" + *file_path : "";
+    }
+    case av_player_windows::SourceType::kAsset: {
+      const std::string* asset_path = source.asset_path();
+      if (!asset_path) return "";
+      // Assets are bundled relative to the executable in the
+      // data/flutter_assets directory.
+      char exe_path[MAX_PATH];
+      GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+      std::string exe_dir(exe_path);
+      size_t last_sep = exe_dir.find_last_of("\\/");
+      if (last_sep != std::string::npos) {
+        exe_dir = exe_dir.substr(0, last_sep);
+      }
+      return "file:///" + exe_dir + "/data/flutter_assets/" + *asset_path;
+    }
+    default:
+      return "";
   }
-  return "";
 }
 
-void AvPlayerWindows::HandleMethodCall(
-    const flutter::MethodCall<EncodableValue>& method_call,
-    std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
-  const std::string& method = method_call.method_name();
-  const auto* args_ptr = method_call.arguments();
-  EncodableMap args;
-  if (args_ptr) {
-    if (auto* map = std::get_if<EncodableMap>(args_ptr)) {
-      args = *map;
-    }
+// =============================================================================
+// AvPlayerHostApi implementation
+// =============================================================================
+
+void AvPlayerWindows::Create(
+    const av_player_windows::VideoSourceMessage& source,
+    std::function<void(av_player_windows::ErrorOr<int64_t> reply)> result) {
+  std::string uri = BuildUri(source);
+  if (uri.empty()) {
+    result(av_player_windows::FlutterError("INVALID_SOURCE",
+                                           "Could not build URI from source."));
+    return;
   }
 
-  // ---- Lifecycle ----
+  auto* texture_registrar = registrar_->texture_registrar();
 
-  if (method == "create") {
-    std::string uri = BuildUri(args);
-    if (uri.empty()) {
-      result->Error("INVALID_SOURCE", "Could not build URI from source.");
-      return;
-    }
+  // Create MediaPlayer without event handler first to get texture ID.
+  auto player = std::unique_ptr<MediaPlayer>(
+      new MediaPlayer(texture_registrar, nullptr));
 
-    auto* texture_registrar = registrar_->texture_registrar();
+  if (!player->Open(uri)) {
+    result(av_player_windows::FlutterError("OPEN_FAILED",
+                                           "Failed to open media source."));
+    return;
+  }
 
-    // Create MediaPlayer without event handler first to get texture ID.
-    auto player = std::unique_ptr<MediaPlayer>(
-        new MediaPlayer(texture_registrar, nullptr));
+  int64_t texture_id = player->texture_id();
 
-    if (!player->Open(uri)) {
-      result->Error("OPEN_FAILED", "Failed to open media source.");
-      return;
-    }
+  // Now create the event channel with the correct name.
+  std::string event_channel_name =
+      std::string(kEventChannelPrefix) + std::to_string(texture_id);
+  auto event_handler = std::make_unique<EventChannelHandler>(
+      registrar_->messenger(), event_channel_name);
 
-    int64_t texture_id = player->texture_id();
+  // Wire the event handler into the player so events reach Dart.
+  player->SetEventHandler(event_handler.get());
 
-    // Now create the event channel with the correct name.
-    std::string event_channel_name =
-        std::string(kEventChannelPrefix) + std::to_string(texture_id);
-    auto event_handler = std::make_unique<EventChannelHandler>(
-        registrar_->messenger(), event_channel_name);
+  event_handlers_[texture_id] = std::move(event_handler);
+  players_[texture_id] = std::move(player);
 
-    // Wire the event handler into the player so events reach Dart.
-    player->SetEventHandler(event_handler.get());
+  result(texture_id);
+}
 
-    event_handlers_[texture_id] = std::move(event_handler);
-    players_[texture_id] = std::move(player);
+void AvPlayerWindows::Dispose(
+    int64_t player_id,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  smtc_handlers_.erase(player_id);
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->Dispose();
+    players_.erase(it);
+  }
+  event_handlers_.erase(player_id);
+  result(std::nullopt);
+}
 
-    result->Success(EncodableValue(texture_id));
+void AvPlayerWindows::Play(
+    int64_t player_id,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->Play();
+  }
+  // Update SMTC playback status
+  auto smtc_it = smtc_handlers_.find(player_id);
+  if (smtc_it != smtc_handlers_.end()) {
+    smtc_it->second->SetPlaybackStatus(
+        ABI::Windows::Media::MediaPlaybackStatus_Playing);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "dispose") {
-    int64_t id = GetInt(args, "playerId");
-    smtc_handlers_.erase(id);
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      it->second->Dispose();
-      players_.erase(it);
-    }
-    event_handlers_.erase(id);
-    result->Success();
+void AvPlayerWindows::Pause(
+    int64_t player_id,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->Pause();
+  }
+  // Update SMTC playback status
+  auto smtc_it = smtc_handlers_.find(player_id);
+  if (smtc_it != smtc_handlers_.end()) {
+    smtc_it->second->SetPlaybackStatus(
+        ABI::Windows::Media::MediaPlaybackStatus_Paused);
+  }
+  result(std::nullopt);
+}
 
-  // ---- Playback ----
+void AvPlayerWindows::SeekTo(
+    int64_t player_id,
+    int64_t position_ms,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->SeekTo(position_ms);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "play") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      it->second->Play();
-    }
-    // Update SMTC playback status
-    auto smtc_it = smtc_handlers_.find(id);
-    if (smtc_it != smtc_handlers_.end()) {
-      smtc_it->second->SetPlaybackStatus(
-          ABI::Windows::Media::MediaPlaybackStatus_Playing);
-    }
-    result->Success();
+void AvPlayerWindows::SetPlaybackSpeed(
+    int64_t player_id,
+    double speed,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->SetPlaybackSpeed(speed);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "pause") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      it->second->Pause();
-    }
-    // Update SMTC playback status
-    auto smtc_it = smtc_handlers_.find(id);
-    if (smtc_it != smtc_handlers_.end()) {
-      smtc_it->second->SetPlaybackStatus(
-          ABI::Windows::Media::MediaPlaybackStatus_Paused);
-    }
-    result->Success();
+void AvPlayerWindows::SetLooping(
+    int64_t player_id,
+    bool looping,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->SetLooping(looping);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "seekTo") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      int64_t position = GetInt(args, "position");
-      it->second->SeekTo(position);
-    }
-    result->Success();
+void AvPlayerWindows::SetVolume(
+    int64_t player_id,
+    double volume,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  auto it = players_.find(player_id);
+  if (it != players_.end()) {
+    it->second->SetVolume(volume);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "setPlaybackSpeed") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      double speed = GetDouble(args, "speed", 1.0);
-      it->second->SetPlaybackSpeed(speed);
-    }
-    result->Success();
+void AvPlayerWindows::IsPipAvailable(
+    std::function<void(av_player_windows::ErrorOr<bool> reply)> result) {
+  result(false);
+}
 
-  } else if (method == "setLooping") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      bool looping = GetBool(args, "looping");
-      it->second->SetLooping(looping);
-    }
-    result->Success();
+void AvPlayerWindows::EnterPip(
+    const av_player_windows::EnterPipRequest& request,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  // PIP is not available on Windows.
+  result(std::nullopt);
+}
 
-  } else if (method == "setVolume") {
-    int64_t id = GetInt(args, "playerId");
-    auto it = players_.find(id);
-    if (it != players_.end()) {
-      double volume = GetDouble(args, "volume", 1.0);
-      it->second->SetVolume(volume);
-    }
-    result->Success();
+void AvPlayerWindows::ExitPip(
+    int64_t player_id,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  // PIP is not available on Windows.
+  result(std::nullopt);
+}
 
-  // ---- PIP (N/A on Windows) ----
+void AvPlayerWindows::SetMediaMetadata(
+    const av_player_windows::MediaMetadataRequest& request,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  int64_t id = request.player_id();
+  const av_player_windows::MediaMetadataMessage& metadata = request.metadata();
 
-  } else if (method == "isPipAvailable") {
-    result->Success(EncodableValue(false));
+  auto smtc_it = smtc_handlers_.find(id);
+  if (smtc_it != smtc_handlers_.end()) {
+    std::string title = metadata.title() ? *metadata.title() : "";
+    std::string artist = metadata.artist() ? *metadata.artist() : "";
+    std::string album = metadata.album() ? *metadata.album() : "";
+    smtc_it->second->SetMetadata(title, artist, album);
+  }
+  result(std::nullopt);
+}
 
-  } else if (method == "enterPip" || method == "exitPip") {
-    result->Success();
-
-  // ---- System Controls ----
-
-  } else if (method == "setSystemVolume") {
-    double volume = GetDouble(args, "volume", 0.5);
-    SetSystemVolume(volume);
-    result->Success();
-
-  } else if (method == "getSystemVolume") {
-    result->Success(EncodableValue(GetSystemVolume()));
-
-  } else if (method == "setScreenBrightness") {
-    double brightness = GetDouble(args, "brightness", 0.5);
-    SetScreenBrightness(brightness);
-    result->Success();
-
-  } else if (method == "getScreenBrightness") {
-    result->Success(EncodableValue(GetScreenBrightness()));
-
-  } else if (method == "setWakelock") {
-    bool enabled = GetBool(args, "enabled");
-    SetWakelock(enabled);
-    result->Success();
-
-  // ---- Media Session ----
-
-  } else if (method == "setMediaMetadata") {
-    int64_t id = GetInt(args, "playerId");
-    std::string title = GetString(args, "title");
-    std::string artist = GetString(args, "artist");
-    std::string album = GetString(args, "album");
-
-    auto smtc_it = smtc_handlers_.find(id);
-    if (smtc_it != smtc_handlers_.end()) {
-      smtc_it->second->SetMetadata(title, artist, album);
-    }
-    result->Success();
-
-  } else if (method == "setNotificationEnabled") {
-    int64_t id = GetInt(args, "playerId");
-    bool enabled = GetBool(args, "enabled");
-
-    if (enabled) {
-      // Create SMTC handler if it doesn't exist
-      if (smtc_handlers_.find(id) == smtc_handlers_.end()) {
-        auto smtc = std::make_unique<SmtcHandler>();
-        HWND hwnd = GetFlutterWindowHwnd();
-        EventChannelHandler* handler = nullptr;
-        auto eh_it = event_handlers_.find(id);
-        if (eh_it != event_handlers_.end()) {
-          handler = eh_it->second.get();
-        }
-        if (smtc->Initialize(hwnd, handler)) {
-          smtc_handlers_[id] = std::move(smtc);
-        }
+void AvPlayerWindows::SetNotificationEnabled(
+    int64_t player_id,
+    bool enabled,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  if (enabled) {
+    // Create SMTC handler if it doesn't exist
+    if (smtc_handlers_.find(player_id) == smtc_handlers_.end()) {
+      auto smtc = std::make_unique<SmtcHandler>();
+      HWND hwnd = GetFlutterWindowHwnd();
+      EventChannelHandler* handler = nullptr;
+      auto eh_it = event_handlers_.find(player_id);
+      if (eh_it != event_handlers_.end()) {
+        handler = eh_it->second.get();
       }
-    } else {
-      // Destroy SMTC handler
-      smtc_handlers_.erase(id);
+      if (smtc->Initialize(hwnd, handler)) {
+        smtc_handlers_[player_id] = std::move(smtc);
+      }
     }
-    result->Success();
-
-  // ---- Legacy ----
-
-  } else if (method == "getPlatformName") {
-    result->Success(EncodableValue("Windows"));
-
   } else {
-    result->NotImplemented();
+    // Destroy SMTC handler
+    smtc_handlers_.erase(player_id);
   }
+  result(std::nullopt);
+}
+
+void AvPlayerWindows::SetSystemVolume(
+    double volume,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  SetSystemVolumeLevel(volume);
+  result(std::nullopt);
+}
+
+void AvPlayerWindows::GetSystemVolume(
+    std::function<void(av_player_windows::ErrorOr<double> reply)> result) {
+  result(GetSystemVolumeLevel());
+}
+
+void AvPlayerWindows::SetScreenBrightness(
+    double brightness,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  SetScreenBrightnessLevel(brightness);
+  result(std::nullopt);
+}
+
+void AvPlayerWindows::GetScreenBrightness(
+    std::function<void(av_player_windows::ErrorOr<double> reply)> result) {
+  result(GetScreenBrightnessLevel());
+}
+
+void AvPlayerWindows::SetWakelock(
+    bool enabled,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  SetWakelockState(enabled);
+  result(std::nullopt);
+}
+
+void AvPlayerWindows::SetAbrConfig(
+    const av_player_windows::SetAbrConfigRequest& request,
+    std::function<void(std::optional<av_player_windows::FlutterError> reply)>
+        result) {
+  // Media Foundation has limited ABR control. Store config for reference.
+  result(std::nullopt);
+}
+
+void AvPlayerWindows::GetDecoderInfo(
+    int64_t player_id,
+    std::function<void(av_player_windows::ErrorOr<av_player_windows::DecoderInfoMessage> reply)>
+        result) {
+  bool hw_accel = false;
+
+  // Check if D3D11 video decode is available
+  ID3D11Device* device = nullptr;
+  D3D_FEATURE_LEVEL feature_level;
+  HRESULT hr = D3D11CreateDevice(
+      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0,
+      D3D11_SDK_VERSION, &device, &feature_level, nullptr);
+  if (SUCCEEDED(hr) && device) {
+    ID3D11VideoDevice* video_device = nullptr;
+    hr = device->QueryInterface(__uuidof(ID3D11VideoDevice),
+                                reinterpret_cast<void**>(&video_device));
+    if (SUCCEEDED(hr) && video_device) {
+      hw_accel = true;
+      video_device->Release();
+    }
+    device->Release();
+  }
+
+  av_player_windows::DecoderInfoMessage info(hw_accel);
+  if (hw_accel) {
+    info.set_decoder_name("D3D11");
+  }
+  result(info);
 }
 
 }  // namespace

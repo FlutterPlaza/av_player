@@ -6,104 +6,49 @@ import MediaPlayer
 import CoreAudio
 import IOKit
 import IOKit.pwr_mgt
+import VideoToolbox
 
 // =============================================================================
 // MARK: - Plugin
 // =============================================================================
 
-public class AvPlayerPlugin: NSObject, FlutterPlugin {
+@objc(AvPlayerPlugin)
+public class AvPlayerPlugin: NSObject, FlutterPlugin, AvPlayerHostApi {
     private let registrar: FlutterPluginRegistrar
-    private let channel: FlutterMethodChannel
     private var players: [Int64: PlayerInstance] = [:]
     private var wakelockAssertionID: IOPMAssertionID = 0
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     static let channelName = "com.flutterplaza.av_player_macos"
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
-        self.channel = FlutterMethodChannel(
-            name: Self.channelName,
-            binaryMessenger: registrar.messenger
-        )
         super.init()
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = AvPlayerPlugin(registrar: registrar)
-        registrar.addMethodCallDelegate(instance, channel: instance.channel)
-    }
-
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        switch call.method {
-        case "create":
-            handleCreate(call, result: result)
-        case "dispose":
-            handleDispose(call, result: result)
-        case "play":
-            withPlayer(call, result: result) { instance in
-                instance.player.play()
-                if instance.playbackSpeed != 1.0 {
-                    instance.player.rate = instance.playbackSpeed
-                }
-            }
-        case "pause":
-            withPlayer(call, result: result) { $0.player.pause() }
-        case "seekTo":
-            handleSeekTo(call, result: result)
-        case "setPlaybackSpeed":
-            handleSetPlaybackSpeed(call, result: result)
-        case "setLooping":
-            handleSetLooping(call, result: result)
-        case "setVolume":
-            handleSetVolume(call, result: result)
-        case "isPipAvailable":
-            result(AVPictureInPictureController.isPictureInPictureSupported())
-        case "enterPip":
-            handleEnterPip(call, result: result)
-        case "exitPip":
-            handleExitPip(call, result: result)
-        case "setSystemVolume":
-            handleSetSystemVolume(call, result: result)
-        case "getSystemVolume":
-            result(Self.getSystemVolume())
-        case "setScreenBrightness":
-            handleSetScreenBrightness(call, result: result)
-        case "getScreenBrightness":
-            result(Double(Self.getScreenBrightness()))
-        case "setWakelock":
-            handleSetWakelock(call, result: result)
-        case "setMediaMetadata":
-            handleSetMediaMetadata(call, result: result)
-        case "setNotificationEnabled":
-            handleSetNotificationEnabled(call, result: result)
-        default:
-            result(FlutterMethodNotImplemented)
-        }
+        AvPlayerHostApiSetup.setUp(binaryMessenger: registrar.messenger, api: instance)
+        instance.setupMemoryPressureMonitoring()
     }
 
     // =========================================================================
-    // MARK: - Lifecycle
+    // MARK: - AvPlayerHostApi — Lifecycle
     // =========================================================================
 
-    private func handleCreate(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Arguments required.", details: nil))
-            return
-        }
-
-        let type = args["type"] as? String ?? "network"
+    func create(source: VideoSourceMessage, completion: @escaping (Result<Int64, Error>) -> Void) {
         let videoURL: URL
 
-        switch type {
-        case "network":
-            guard let urlString = args["url"] as? String, let url = URL(string: urlString) else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Network source requires a valid 'url'.", details: nil))
+        switch source.type {
+        case .network:
+            guard let urlString = source.url, let url = URL(string: urlString) else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Network source requires a valid 'url'.", details: nil)))
                 return
             }
             videoURL = url
-        case "asset":
-            guard let assetPath = args["assetPath"] as? String else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Asset source requires 'assetPath'.", details: nil))
+        case .asset:
+            guard let assetPath = source.assetPath else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Asset source requires 'assetPath'.", details: nil)))
                 return
             }
             let key = registrar.lookupKey(forAsset: assetPath)
@@ -113,19 +58,16 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
             // the full path directly.
             let fullPath = "\(Bundle.main.bundlePath)/\(key)"
             guard FileManager.default.fileExists(atPath: fullPath) else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "Asset not found: \(assetPath)", details: nil))
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "Asset not found: \(assetPath)", details: nil)))
                 return
             }
             videoURL = URL(fileURLWithPath: fullPath)
-        case "file":
-            guard let filePath = args["filePath"] as? String else {
-                result(FlutterError(code: "INVALID_SOURCE", message: "File source requires 'filePath'.", details: nil))
+        case .file:
+            guard let filePath = source.filePath else {
+                completion(.failure(PigeonError(code: "INVALID_SOURCE", message: "File source requires 'filePath'.", details: nil)))
                 return
             }
             videoURL = URL(fileURLWithPath: filePath)
-        default:
-            result(FlutterError(code: "INVALID_SOURCE", message: "Unknown source type: \(type)", details: nil))
-            return
         }
 
         // Build AVPlayer
@@ -185,13 +127,12 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
         instance.startDisplayLink()
 
         players[textureId] = instance
-        result(textureId)
+        completion(.success(textureId))
     }
 
-    private func handleDispose(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let playerId = playerIdFrom(call, result: result) else { return }
+    func dispose(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
         disposePlayer(playerId)
-        result(nil)
+        completion(.success(()))
     }
 
     private func disposePlayer(_ playerId: Int64) {
@@ -201,109 +142,183 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
     }
 
     // =========================================================================
-    // MARK: - Playback
+    // MARK: - AvPlayerHostApi — Playback
     // =========================================================================
 
-    private func handleSeekTo(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let positionMs = (args["position"] as? NSNumber)?.int64Value else {
-            result(FlutterError(code: "INVALID_ARGS", message: "position is required.", details: nil))
+    func play(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
+            return
+        }
+        instance.player.play()
+        if instance.playbackSpeed != 1.0 {
+            instance.player.rate = instance.playbackSpeed
+        }
+        completion(.success(()))
+    }
+
+    func pause(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
+            return
+        }
+        instance.player.pause()
+        completion(.success(()))
+    }
+
+    func seekTo(playerId: Int64, positionMs: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
             return
         }
         let time = CMTime(value: positionMs, timescale: 1000)
         instance.player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
-            result(nil)
+            completion(.success(()))
         }
     }
 
-    private func handleSetPlaybackSpeed(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let speed = (args["speed"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "speed is required.", details: nil))
+    func setPlaybackSpeed(playerId: Int64, speed: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
             return
         }
-        instance.playbackSpeed = speed
+        instance.playbackSpeed = Float(speed)
         if instance.player.rate != 0 {
-            instance.player.rate = speed
+            instance.player.rate = Float(speed)
         }
-        result(nil)
+        completion(.success(()))
     }
 
-    private func handleSetLooping(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let looping = args["looping"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "looping is required.", details: nil))
+    func setLooping(playerId: Int64, looping: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
             return
         }
         instance.isLooping = looping
-        result(nil)
+        completion(.success(()))
     }
 
-    private func handleSetVolume(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let volume = (args["volume"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "volume is required.", details: nil))
+    func setVolume(playerId: Int64, volume: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
             return
         }
-        instance.player.volume = max(0, min(1, volume))
-        result(nil)
+        instance.player.volume = Float(max(0, min(1, volume)))
+        completion(.success(()))
     }
 
     // =========================================================================
-    // MARK: - PIP
+    // MARK: - AvPlayerHostApi — PIP
     // =========================================================================
 
-    private func handleEnterPip(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
+    func isPipAvailable(completion: @escaping (Result<Bool, Error>) -> Void) {
+        completion(.success(AVPictureInPictureController.isPictureInPictureSupported()))
+    }
+
+    func enterPip(request: EnterPipRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[request.playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(request.playerId) not found.", details: nil)))
+            return
+        }
         guard let pipController = instance.pipController else {
-            result(FlutterError(code: "PIP_UNAVAILABLE", message: "PIP is not available.", details: nil))
+            completion(.failure(PigeonError(code: "PIP_UNAVAILABLE", message: "PIP is not available.", details: nil)))
             return
         }
         pipController.startPictureInPicture()
-        result(nil)
+        completion(.success(()))
     }
 
-    private func handleExitPip(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
+    func exitPip(playerId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
+            return
+        }
         instance.pipController?.stopPictureInPicture()
-        result(nil)
+        completion(.success(()))
     }
 
     // =========================================================================
-    // MARK: - System Controls
+    // MARK: - AvPlayerHostApi — Performance
     // =========================================================================
 
-    private func handleSetSystemVolume(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let volume = (args["volume"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "volume is required.", details: nil))
+    func setAbrConfig(request: SetAbrConfigRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[request.playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(request.playerId) not found.", details: nil)))
             return
         }
-        Self.setSystemVolume(Double(max(0, min(1, volume))))
-        result(nil)
+        if let maxBitrate = request.config.maxBitrateBps {
+            instance.playerItem.preferredPeakBitRate = Double(maxBitrate)
+        }
+        if let maxWidth = request.config.preferredMaxWidth,
+           let maxHeight = request.config.preferredMaxHeight {
+            instance.playerItem.preferredMaximumResolution = CGSize(
+                width: CGFloat(maxWidth), height: CGFloat(maxHeight))
+        }
+        completion(.success(()))
     }
 
-    private func handleSetScreenBrightness(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let brightness = (args["brightness"] as? NSNumber)?.floatValue else {
-            result(FlutterError(code: "INVALID_ARGS", message: "brightness is required.", details: nil))
-            return
-        }
-        Self.setScreenBrightness(max(0, min(1, brightness)))
-        result(nil)
+    func getDecoderInfo(playerId: Int64, completion: @escaping (Result<DecoderInfoMessage, Error>) -> Void) {
+        let hwH264 = VTIsHardwareDecodeSupported(kCMVideoCodecType_H264)
+        let hwHEVC = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
+        let isHW = hwH264 || hwHEVC
+        var codecName: String? = nil
+        if hwHEVC { codecName = "HEVC" }
+        else if hwH264 { codecName = "H.264" }
+        completion(.success(DecoderInfoMessage(
+            isHardwareAccelerated: isHW,
+            decoderName: isHW ? "VideoToolbox" : nil,
+            codec: codecName
+        )))
     }
 
-    private func handleSetWakelock(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let enabled = args["enabled"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "enabled is required.", details: nil))
-            return
+    private func setupMemoryPressureMonitoring() {
+        let source = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            let event = source.data
+            let level: String
+            if event.contains(.critical) {
+                level = "critical"
+            } else {
+                level = "warning"
+            }
+            for instance in self.players.values {
+                instance.eventSink.success([
+                    "type": "memoryPressure",
+                    "level": level,
+                ])
+            }
         }
+        source.resume()
+        memoryPressureSource = source
+    }
 
+    // =========================================================================
+    // MARK: - AvPlayerHostApi — System Controls
+    // =========================================================================
+
+    func setSystemVolume(volume: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        Self.setSystemVolume(max(0, min(1, volume)))
+        completion(.success(()))
+    }
+
+    func getSystemVolume(completion: @escaping (Result<Double, Error>) -> Void) {
+        completion(.success(Self.getSystemVolume()))
+    }
+
+    func setScreenBrightness(brightness: Double, completion: @escaping (Result<Void, Error>) -> Void) {
+        Self.setScreenBrightness(Float(max(0, min(1, brightness))))
+        completion(.success(()))
+    }
+
+    func getScreenBrightness(completion: @escaping (Result<Double, Error>) -> Void) {
+        completion(.success(Double(Self.getScreenBrightness())))
+    }
+
+    func setWakelock(enabled: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         if enabled {
             if wakelockAssertionID == 0 {
                 IOPMAssertionCreateWithName(
@@ -319,7 +334,7 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
                 wakelockAssertionID = 0
             }
         }
-        result(nil)
+        completion(.success(()))
     }
 
     // =========================================================================
@@ -425,20 +440,20 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
     }
 
     // =========================================================================
-    // MARK: - Media Session
+    // MARK: - AvPlayerHostApi — Media Session
     // =========================================================================
 
-    private func handleSetMediaMetadata(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Arguments required.", details: nil))
+    func setMediaMetadata(request: MediaMetadataRequest, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[request.playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(request.playerId) not found.", details: nil)))
             return
         }
 
-        instance.metadataTitle = args["title"] as? String
-        instance.metadataArtist = args["artist"] as? String
-        instance.metadataAlbum = args["album"] as? String
-        let artworkUrl = args["artworkUrl"] as? String
+        let metadata = request.metadata
+        instance.metadataTitle = metadata.title
+        instance.metadataArtist = metadata.artist
+        instance.metadataAlbum = metadata.album
+        let artworkUrl = metadata.artworkUrl
 
         instance.updateNowPlayingInfo()
 
@@ -456,14 +471,12 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
             }
         }
 
-        result(nil)
+        completion(.success(()))
     }
 
-    private func handleSetNotificationEnabled(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let enabled = args["enabled"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: "enabled is required.", details: nil))
+    func setNotificationEnabled(playerId: Int64, enabled: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let instance = players[playerId] else {
+            completion(.failure(PigeonError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil)))
             return
         }
 
@@ -477,35 +490,7 @@ public class AvPlayerPlugin: NSObject, FlutterPlugin {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
 
-        result(nil)
-    }
-
-    // =========================================================================
-    // MARK: - Helpers
-    // =========================================================================
-
-    private func withPlayer(_ call: FlutterMethodCall, result: @escaping FlutterResult, action: (PlayerInstance) -> Void) {
-        guard let instance = getPlayer(call, result: result) else { return }
-        action(instance)
-        result(nil)
-    }
-
-    private func getPlayer(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> PlayerInstance? {
-        guard let playerId = playerIdFrom(call, result: result) else { return nil }
-        guard let instance = players[playerId] else {
-            result(FlutterError(code: "NO_PLAYER", message: "Player \(playerId) not found.", details: nil))
-            return nil
-        }
-        return instance
-    }
-
-    private func playerIdFrom(_ call: FlutterMethodCall, result: @escaping FlutterResult) -> Int64? {
-        guard let args = call.arguments as? [String: Any],
-              let playerId = (args["playerId"] as? NSNumber)?.int64Value else {
-            result(FlutterError(code: "INVALID_ARGS", message: "playerId is required.", details: nil))
-            return nil
-        }
-        return playerId
+        completion(.success(()))
     }
 }
 
@@ -545,6 +530,7 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
     private var statusObservation: NSKeyValueObservation?
     private var loadedTimeRangesObservation: NSKeyValueObservation?
     private var timeControlStatusObservation: NSKeyValueObservation?
+    private var accessLogObserver: NSObjectProtocol?
 
     init(
         player: AVPlayer,
@@ -644,6 +630,24 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
             name: .AVPlayerItemDidPlayToEndTime,
             object: playerItem
         )
+
+        // ABR info from access log
+        accessLogObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemNewAccessLogEntry,
+            object: playerItem,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self,
+                  let event = self.playerItem.accessLog()?.events.last else { return }
+            let bitrate = Int64(event.indicatedBitrate)
+            if bitrate > 0 {
+                self.eventSink.success([
+                    "type": "abrInfo",
+                    "currentBitrateBps": bitrate,
+                    "availableBitrateBps": [bitrate],
+                ])
+            }
+        }
     }
 
     private func handleStatusChange(_ status: AVPlayerItem.Status) {
@@ -897,6 +901,10 @@ private class PlayerInstance: NSObject, FlutterTexture, AVPictureInPictureContro
         timeControlStatusObservation = nil
 
         NotificationCenter.default.removeObserver(self)
+        if let observer = accessLogObserver {
+            NotificationCenter.default.removeObserver(observer)
+            accessLogObserver = nil
+        }
 
         pipController?.delegate = nil
         pipController = nil

@@ -91,6 +91,14 @@ class TestMockPlatform extends AvPlayerPlatform {
   Future<void> setWakelock(bool enabled) async => log.add('setWakelock');
 
   @override
+  Future<void> setAbrConfig(int playerId, AVAbrConfig config) async =>
+      log.add('setAbrConfig');
+
+  @override
+  Future<AVDecoderInfo> getDecoderInfo(int playerId) async =>
+      AVDecoderInfo.unknown;
+
+  @override
   Stream<AVPlayerEvent> playerEvents(int playerId) {
     _eventController = StreamController<AVPlayerEvent>();
     return _eventController!.stream;

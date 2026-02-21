@@ -102,6 +102,54 @@ class AVMediaMetadata {
 }
 
 // ---------------------------------------------------------------------------
+// ABR config
+// ---------------------------------------------------------------------------
+
+/// Configuration for Adaptive Bitrate streaming.
+@immutable
+class AVAbrConfig {
+  const AVAbrConfig({
+    this.maxBitrateBps,
+    this.minBitrateBps,
+    this.preferredMaxWidth,
+    this.preferredMaxHeight,
+  });
+
+  final int? maxBitrateBps;
+  final int? minBitrateBps;
+  final int? preferredMaxWidth;
+  final int? preferredMaxHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Decoder info
+// ---------------------------------------------------------------------------
+
+/// Information about the active video decoder.
+@immutable
+class AVDecoderInfo {
+  const AVDecoderInfo({
+    required this.isHardwareAccelerated,
+    this.decoderName,
+    this.codec,
+  });
+
+  final bool isHardwareAccelerated;
+  final String? decoderName;
+  final String? codec;
+
+  /// Default value for platforms that cannot query decoder state.
+  static const unknown = AVDecoderInfo(isHardwareAccelerated: false);
+}
+
+// ---------------------------------------------------------------------------
+// Memory pressure
+// ---------------------------------------------------------------------------
+
+/// Severity level of OS memory pressure.
+enum AVMemoryPressureLevel { normal, warning, critical }
+
+// ---------------------------------------------------------------------------
 // Player events
 // ---------------------------------------------------------------------------
 
@@ -147,6 +195,17 @@ sealed class AVPlayerEvent {
           seekPosition: map['seekPosition'] != null
               ? Duration(milliseconds: map['seekPosition'] as int)
               : null,
+        ),
+      'abrInfo' => AVAbrInfoEvent(
+          currentBitrateBps: map['currentBitrateBps'] as int,
+          availableBitrateBps:
+              (map['availableBitrateBps'] as List<dynamic>).cast<int>(),
+        ),
+      'memoryPressure' => AVMemoryPressureEvent(
+          level: AVMemoryPressureLevel.values.firstWhere(
+            (l) => l.name == map['level'],
+            orElse: () => AVMemoryPressureLevel.normal,
+          ),
         ),
       _ => AVErrorEvent(message: 'Unknown event type: $type'),
     };
@@ -211,6 +270,22 @@ class AVMediaCommandEvent extends AVPlayerEvent {
 
   /// Only set for [AVMediaCommand.seekTo].
   final Duration? seekPosition;
+}
+
+/// ABR info updated (current and available bitrates).
+class AVAbrInfoEvent extends AVPlayerEvent {
+  const AVAbrInfoEvent({
+    required this.currentBitrateBps,
+    required this.availableBitrateBps,
+  });
+  final int currentBitrateBps;
+  final List<int> availableBitrateBps;
+}
+
+/// OS memory pressure level changed.
+class AVMemoryPressureEvent extends AVPlayerEvent {
+  const AVMemoryPressureEvent({required this.level});
+  final AVMemoryPressureLevel level;
 }
 
 // ---------------------------------------------------------------------------

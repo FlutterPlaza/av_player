@@ -9,10 +9,12 @@ add_library(${PLUGIN_NAME} SHARED
   "media_player.cpp"
   "event_channel_handler.cpp"
   "smtc_handler.cpp"
+  "messages.g.cpp"
   "include/av_player_windows/av_player_windows.h"
   "media_player.h"
   "event_channel_handler.h"
   "smtc_handler.h"
+  "messages.g.h"
 )
 apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)

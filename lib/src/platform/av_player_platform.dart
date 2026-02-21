@@ -142,6 +142,20 @@ abstract class AvPlayerPlatform extends PlatformInterface {
   }
 
   // ===========================================================================
+  // Performance
+  // ===========================================================================
+
+  /// Sets the adaptive bitrate streaming configuration for [playerId].
+  Future<void> setAbrConfig(int playerId, AVAbrConfig config) {
+    throw UnimplementedError('setAbrConfig() has not been implemented.');
+  }
+
+  /// Returns decoder information for [playerId].
+  Future<AVDecoderInfo> getDecoderInfo(int playerId) {
+    throw UnimplementedError('getDecoderInfo() has not been implemented.');
+  }
+
+  // ===========================================================================
   // Events
   // ===========================================================================
 

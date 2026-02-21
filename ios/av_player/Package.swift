@@ -7,7 +7,7 @@ let package = Package(
         .iOS("13.0")
     ],
     products: [
-        .library(name: "av-player", targets: ["av_player"])
+        .library(name: "av_player", targets: ["av_player"])
     ],
     dependencies: [],
     targets: [

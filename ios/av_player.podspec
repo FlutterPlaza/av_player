@@ -3,7 +3,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_player'
-  s.version          = '0.3.0'
+  s.version          = '0.4.0'
   s.summary          = 'iOS implementation of the av_player plugin.'
   s.description      = <<-DESC
   iOS implementation of the av_player plugin, providing native
